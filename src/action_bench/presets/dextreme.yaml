@@ -1,0 +1,11 @@
+benchmark: dextreme
+hands: [allegro]
+control_hz: 30.0
+target_ema: 0.175
+methods:
+  joint_absolute: {}
+  joint_delta: {joint_rate: 3.0}
+  eigen_absolute: {}
+  eigen_delta_joint_delta: {eigen_rate: 3.0, joint_rate: 3.0}
+  joint_absolute_eigen_residual: {eigen_residual_fraction: 0.3}
+  eigendexplore: {iid_sigma: 0.7071067811865476, eigen_rms: 0.7071067811865476, spectrum_power: 1.0}

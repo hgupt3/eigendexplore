@@ -1,0 +1,263 @@
+# cold_start_posture (canonical right, rad) and eigen_noise_rms are the mean
+# posture and full-rank joint RMS of each hand's ARCTIC posture PCA.
+schema_version: 2
+id: spider_five_hand_right_runtime_v2
+hands:
+  sharpa:
+    layout: sharpa_right
+    host_name_map: null
+    cold_start_posture: [0.6451113224029541, 0.10771258920431137, 0.13123172521591187, -0.09148558974266052, 0.0478140190243721, 0.2849339544773102, 0.05840357020497322, 0.5482243299484253, 0.0781184509396553, 0.5285940170288086, 0.08299946784973145, 0.5220866203308105, 0.0442887507379055, 0.6145570874214172, 0.008176569826900959, 0.3536752462387085, 0.02920907735824585, 0.037744149565696716, 0.7138664126396179, 0.07071804255247116, 0.21326430141925812, 0.01795612834393978]
+    eigen_noise_rms: 0.23538055388935233
+    effort_limits:
+    - 3.3
+    - 3.3
+    - 1.864
+    - 1.864
+    - 0.638
+    - 1.864
+    - 1.864
+    - 0.638
+    - 0.189369
+    - 1.864
+    - 1.864
+    - 0.638
+    - 0.189369
+    - 1.864
+    - 1.864
+    - 0.638
+    - 0.189369
+    - 0.5285
+    - 1.864
+    - 1.864
+    - 0.638
+    - 0.189369
+    effort_source:
+      asset: spider/assets/robots/sharpa/sharpa_hand_right_6dof.urdf
+      joints:
+      - right_thumb_CMC_FE
+      - right_thumb_CMC_AA
+      - right_thumb_MCP_FE
+      - right_thumb_MCP_AA
+      - right_thumb_IP
+      - right_index_MCP_FE
+      - right_index_MCP_AA
+      - right_index_PIP
+      - right_index_DIP
+      - right_middle_MCP_FE
+      - right_middle_MCP_AA
+      - right_middle_PIP
+      - right_middle_DIP
+      - right_ring_MCP_FE
+      - right_ring_MCP_AA
+      - right_ring_PIP
+      - right_ring_DIP
+      - right_pinky_CMC
+      - right_pinky_MCP_FE
+      - right_pinky_MCP_AA
+      - right_pinky_PIP
+      - right_pinky_DIP
+  allegro:
+    layout: allegro_right
+    host_name_map: allegro
+    cold_start_posture: [-0.1888718605041504, 0.4137422740459442, 0.39058175683021545, -0.02759311906993389, -0.14533543586730957, 0.667874276638031, 0.33780354261398315, -0.049472130835056305, -0.0190590713173151, 0.8568169474601746, 0.05185262858867645, -0.12419693917036057, 0.8928095698356628, 0.2341236025094986, 1.0484287738800049, -0.11137423664331436]
+    eigen_noise_rms: 0.26553922326659907
+    effort_limits:
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    effort_source:
+      asset: dexmachina/assets/allegro_hand/allegro_hand_right_6dof.urdf
+      joints:
+      - joint_0.0
+      - joint_1.0
+      - joint_2.0
+      - joint_3.0
+      - joint_4.0
+      - joint_5.0
+      - joint_6.0
+      - joint_7.0
+      - joint_8.0
+      - joint_9.0
+      - joint_10.0
+      - joint_11.0
+      - joint_12.0
+      - joint_13.0
+      - joint_14.0
+      - joint_15.0
+  xhand:
+    layout: xhand_right
+    host_name_map: null
+    cold_start_posture: [0.7033724784851074, 0.4931744337081909, 0.07766520977020264, 0.032744742929935455, 0.5817565321922302, 0.22021900117397308, 0.6514315605163574, 0.3753220736980438, 0.6992501616477966, 0.25351351499557495, 0.753543496131897, 0.1991792768239975]
+    eigen_noise_rms: 0.2972938856530565
+    effort_limits:
+    - 1.1
+    - 1.1
+    - 0.4
+    - 0.4
+    - 1.1
+    - 0.4
+    - 1.1
+    - 0.4
+    - 1.1
+    - 0.4
+    - 1.1
+    - 0.4
+    effort_source:
+      asset: spider/assets/robots/xhand/xhand_right_6dof.urdf
+      joints:
+      - right_hand_thumb_bend_joint
+      - right_hand_thumb_rota_joint1
+      - right_hand_thumb_rota_joint2
+      - right_hand_index_bend_joint
+      - right_hand_index_joint1
+      - right_hand_index_joint2
+      - right_hand_mid_joint1
+      - right_hand_mid_joint2
+      - right_hand_ring_joint1
+      - right_hand_ring_joint2
+      - right_hand_pinky_joint1
+      - right_hand_pinky_joint2
+  inspire:
+    layout: inspire_right
+    host_name_map: inspire
+    cold_start_posture: [0.7547268271446228, 0.2683190107345581, 0.3371751010417938, 0.4617789089679718, 0.48954111337661743, 0.507838785648346]
+    eigen_noise_rms: 0.2880992687046522
+    effort_limits:
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    - 10.0
+    effort_source:
+      asset: dexmachina/assets/inspire_hand/right_xyz_copy.urdf
+      joints:
+      - R_TH_J1
+      - R_TH_J2
+      - R_TH_J3
+      - R_TH_J4
+      - R_FF_J1
+      - R_FF_J2
+      - R_MF_J1
+      - R_MF_J2
+      - R_RF_J1
+      - R_RF_J2
+      - R_LF_J1
+      - R_LF_J2
+  schunk:
+    layout: schunk_right
+    host_name_map: schunk
+    cold_start_posture: [0.3009868860244751, 0.1932421326637268, 0.3688364326953888, 0.36983582377433777, 0.4779930114746094, 0.48206570744514465, 0.44676080346107483, 0.41551539301872253, 0.22922763228416443]
+    eigen_noise_rms: 0.23709515588481309
+    effort_limits:
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    - 1000.0
+    effort_source:
+      asset: spider/assets/robots/schunk/schunk_hand_right_6dof.urdf
+      joints:
+      - right_hand_Thumb_Flexion
+      - right_hand_j3
+      - right_hand_j4
+      - right_hand_Thumb_Opposition
+      - right_hand_j5
+      - right_hand_Index_Finger_Distal
+      - right_hand_j14
+      - right_hand_Index_Finger_Proximal
+      - right_hand_Middle_Finger_Proximal
+      - right_hand_Middle_Finger_Distal
+      - right_hand_j15
+      - right_hand_Ring_Finger
+      - right_hand_j12
+      - right_hand_j16
+      - right_hand_Pinky
+      - right_hand_j13
+      - right_hand_j17
+      - right_hand_Finger_Spread
+      - right_hand_index_spread
+      - right_hand_ring_spread
+  wuji:
+    layout: wuji_right
+    host_name_map: null
+    cold_start_posture: [0.7101565003395081, 0.29698896408081055, 0.2743642330169678, -0.06430163979530334, 0.450505793094635, -0.04073014482855797, 0.3721468150615692, 0.09398126602172852, 0.7034704685211182, -0.08065585792064667, 0.36349716782569885, 0.055230312049388885, 0.7791520357131958, 0.02102341316640377, 0.20694215595722198, 0.03966379165649414, 0.8253409266471863, -0.06180480122566223, 0.10914361476898193, -0.052108462899923325]
+    eigen_noise_rms: 0.24347658226374375
+    effort_limits:
+    - 0.4452
+    - 0.4259
+    - 0.1888
+    - 0.1468
+    - 0.6188
+    - 0.1822
+    - 0.2251
+    - 0.217
+    - 0.6494
+    - 0.1827
+    - 0.2078
+    - 0.2018
+    - 0.6389
+    - 0.1832
+    - 0.2249
+    - 0.2044
+    - 0.6441
+    - 0.1798
+    - 0.2384
+    - 0.1866
+    effort_source:
+      asset: dexmachina/assets/wuji_hand/wuji_hand_right_6dof.urdf
+      joints:
+      - right_finger1_joint1
+      - right_finger1_joint2
+      - right_finger1_joint3
+      - right_finger1_joint4
+      - right_finger2_joint1
+      - right_finger2_joint2
+      - right_finger2_joint3
+      - right_finger2_joint4
+      - right_finger3_joint1
+      - right_finger3_joint2
+      - right_finger3_joint3
+      - right_finger3_joint4
+      - right_finger4_joint1
+      - right_finger4_joint2
+      - right_finger4_joint3
+      - right_finger4_joint4
+      - right_finger5_joint1
+      - right_finger5_joint2
+      - right_finger5_joint3
+      - right_finger5_joint4

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "dextreme-allegro-caps-v1",
+  "host_commit": "aeed298638a1f7b5421b38f5f3cc2d1079b6d9c3",
+  "asset_source_revision": "967b790e19c4fb759acaa40d6f23a0d697ef9598",
+  "description": "Calibrated Allegro capped-fingertip task geometry, copied unchanged from the recorded DeXtreme host. Paths are relative to the IsaacGymEnvs checkout. Source asset terms apply.",
+  "files": [
+    "assets/urdf/kuka_allegro_description/allegro_v4_caps.urdf",
+    "assets/urdf/kuka_allegro_description/meshes/allegro_v4/collision/link_tip.obj",
+    "assets/urdf/kuka_allegro_description/meshes/allegro_v4/visual/link_15.0.obj",
+    "assets/urdf/kuka_allegro_description/meshes/allegro_v4/visual/link_3.0.obj",
+    "assets/urdf/kuka_allegro_description/meshes/allegro_v4/visual/link_tip.obj"
+  ]
+}

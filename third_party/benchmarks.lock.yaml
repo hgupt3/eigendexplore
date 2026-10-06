@@ -1,0 +1,29 @@
+schema_version: 2
+benchmarks:
+  dextreme:
+    python: '3.8'
+    repository: https://github.com/isaac-sim/IsaacGymEnvs.git
+    commit: aeed298638a1f7b5421b38f5f3cc2d1079b6d9c3
+    patch: patches/dextreme-release.patch
+    task_supplement: dextreme-allegro-caps-v1
+    rl_games:
+      version: 1.6.5
+      patch: patches/dextreme-rl-games.patch
+  simtoolreal:
+    python: '3.11'
+    repository: https://github.com/hgupt3/simtoolreal.git
+    commit: fddff7462bfb683becb8aa0d73d496dca6065af4
+    patch: patches/simtoolreal-release.patch
+    rl_games:
+      vendored: rl_games
+      commit: da1c32110f9f03ba4264ce4d1d2244d9ab3c1e00
+      patch: patches/simtoolreal-rl-games.patch
+  spider:
+    python: '3.12'
+    repository: https://github.com/facebookresearch/spider.git
+    commit: 71238456bf97a7eeb3d0471aa31974e2d404d4ae
+    patch: patches/spider-release.patch
+    runtime:
+      mujoco: 3.7.0
+      mujoco-warp: 3.7.0.1
+      warp-lang: 1.12.1

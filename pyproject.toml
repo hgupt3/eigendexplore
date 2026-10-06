@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "action-bench"
+version = "0.3.0"
+description = "Six dexterous-hand policy methods, four benchmarks, and packaged posture bases."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.26,<3", "pydantic>=2.7,<3", "PyYAML>=6,<7", "safetensors>=0.4,<1", "torch>=2.4", "eigendexplore==0.3.0"]
+
+[project.urls]
+Homepage = "https://eigendexplore.github.io"
+
+[project.scripts]
+action-bench = "action_bench.cli:main"
+
+[project.optional-dependencies]
+spider = ["mujoco==3.7.0"]
+recording = ["numpy>=1.26,<2", "pyrender>=0.1.45", "yourdfpy>=0.0.56", "imageio[ffmpeg]>=2.34"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/action_bench"]

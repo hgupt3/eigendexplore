@@ -1,0 +1,110 @@
+schema_version: 4
+id: schunk_egosuite_6hz_v1_pca
+kind: pca
+producer_revision: bf217fec2191-worktree-c52f3dabdcd0
+construction: mirrored_pair
+canonical_hand_layout: schunk_right
+deployment_layouts:
+- hand_layout: schunk_left
+  joint_names:
+  - left_hand_Thumb_Flexion
+  - left_hand_Thumb_Opposition
+  - left_hand_Index_Finger_Distal
+  - left_hand_Index_Finger_Proximal
+  - left_hand_Middle_Finger_Proximal
+  - left_hand_Middle_Finger_Distal
+  - left_hand_Ring_Finger
+  - left_hand_Pinky
+  - left_hand_Finger_Spread
+  joint_signs:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+- hand_layout: schunk_right
+  joint_names:
+  - right_hand_Thumb_Flexion
+  - right_hand_Thumb_Opposition
+  - right_hand_Index_Finger_Distal
+  - right_hand_Index_Finger_Proximal
+  - right_hand_Middle_Finger_Proximal
+  - right_hand_Middle_Finger_Distal
+  - right_hand_Ring_Finger
+  - right_hand_Pinky
+  - right_hand_Finger_Spread
+  joint_signs:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+dataset: egosuite
+source_corpora:
+- schunk_arctic_canonical_right_6hz_v18_final_v1
+- schunk_grab_canonical_right_6hz_v18_final_v1
+- schunk_egosuite_complete_canonical_right_6hz_v18_final_v1
+source_validation_protocols:
+- full_chain_fixed_root_report_only_v1
+- full_chain_fixed_root_report_only_v1
+- sharded_full_chain_fixed_root_report_only_v1
+joint_names:
+- right_hand_Thumb_Flexion
+- right_hand_Thumb_Opposition
+- right_hand_Index_Finger_Distal
+- right_hand_Index_Finger_Proximal
+- right_hand_Middle_Finger_Proximal
+- right_hand_Middle_Finger_Distal
+- right_hand_Ring_Finger
+- right_hand_Pinky
+- right_hand_Finger_Spread
+joint_lower:
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+joint_upper:
+- 0.9704
+- 0.9879
+- 1.334
+- 0.79849
+- 0.79849
+- 1.334
+- 0.98175
+- 0.98175
+- 0.5829
+component_count: 9
+fit:
+  split: train
+  split_protocol: egosuite_selected_weight_mixture_v1
+  objective: posture_covariance
+  measure: frame
+  weighting: explicit_dataset_then_trajectory
+  motion_horizon_ms: 100
+  dataset_weights:
+  - 0.6
+  - 0.2
+  - 0.2
+  lower_quantile: 0.01
+  upper_quantile: 0.99
+fit_summary:
+  source_trajectory_count: 9949
+  source_frame_count: 2782828
+  source_sequence_count: 3596
+  fit_trajectory_count: 7934
+  fit_frame_count: 2247940
+  fit_source_sequence_count: 3169
+payload: pca.safetensors

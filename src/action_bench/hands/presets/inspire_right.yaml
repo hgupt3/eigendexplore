@@ -1,0 +1,32 @@
+schema_version: 2
+id: inspire_right
+family: inspire
+side: right
+joint_signs:
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+joint_names:
+- R_TH_J1
+- R_TH_J2
+- R_FF_J1
+- R_MF_J1
+- R_RF_J1
+- R_LF_J1
+joint_lower:
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+joint_upper:
+- 1.3
+- 0.68
+- 1.62
+- 1.62
+- 1.62
+- 1.62

@@ -1,0 +1,44 @@
+schema_version: 2
+id: schunk_left
+family: schunk
+side: left
+joint_signs:
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+joint_names:
+- left_hand_Thumb_Flexion
+- left_hand_Thumb_Opposition
+- left_hand_Index_Finger_Distal
+- left_hand_Index_Finger_Proximal
+- left_hand_Middle_Finger_Proximal
+- left_hand_Middle_Finger_Distal
+- left_hand_Ring_Finger
+- left_hand_Pinky
+- left_hand_Finger_Spread
+joint_lower:
+- -0.9704
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- -0.5829
+joint_upper:
+- 0.0
+- 0.9879
+- 1.334
+- 0.79849
+- 0.79849
+- 1.334
+- 0.98175
+- 0.98175
+- 0.0
