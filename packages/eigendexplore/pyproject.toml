@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eigendexplore"
+version = "0.3.0"
+readme = "README.md"
+description = "Learnable correlated exploration on top of diagonal Gaussian policies."
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = ["torch>=1.13"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eigendexplore"]

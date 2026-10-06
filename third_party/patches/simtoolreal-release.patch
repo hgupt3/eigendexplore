@@ -1,0 +1,297 @@
+diff --git a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
+index 0278ebe4..a795c314 100644
+--- a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
++++ b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
+@@ -48,31 +48,11 @@ class SimToolRealEnv(DirectRLEnv):
+             )
+         elif not callable(cfg.action.hand_action_transform):
+             raise TypeError("action.hand_action_transform must be callable or None")
+-        if cfg.action.hand_fast_offset_transform is not None:
+-            if cfg.action.hand_action_transform is None:
+-                raise ValueError(
+-                    "action.hand_fast_offset_transform requires "
+-                    "action.hand_action_transform"
+-                )
+-            if not callable(cfg.action.hand_fast_offset_transform):
+-                raise TypeError(
+-                    "action.hand_fast_offset_transform must be callable or None"
+-                )
+-        for fn_name in (
+-            "hand_state_reset_fn",
+-            "hand_state_export_fn",
+-            "hand_state_import_fn",
++        if (
++            cfg.action.hand_state_reset_fn is not None
++            and not callable(cfg.action.hand_state_reset_fn)
+         ):
+-            fn = getattr(cfg.action, fn_name)
+-            if fn is not None and not callable(fn):
+-                raise TypeError(f"action.{fn_name} must be callable or None")
+-        if (cfg.action.hand_state_export_fn is None) != (
+-            cfg.action.hand_state_import_fn is None
+-        ):
+-            raise ValueError(
+-                "action.hand_state_export_fn and action.hand_state_import_fn "
+-                "must be provided together"
+-            )
++            raise TypeError("action.hand_state_reset_fn must be callable or None")
+         num_latent_obs = validate_latent_obs_config(
+             cfg.obs.num_latent_obs, cfg.obs.latent_obs_fn
+         )
+diff --git a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
+index 2ebfb607..3d69e766 100644
+--- a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
++++ b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
+@@ -337,19 +337,9 @@ class ActionCfg:
+     hand_action_transform: (
+         Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None
+     ) = None
+-    # Optional memoryless offset decoded from the same raw hand action. The
+-    # action pipeline adds it after the slow hand EMA and before final clamp.
+-    hand_fast_offset_transform: (
+-        Callable[[torch.Tensor], torch.Tensor] | None
+-    ) = None
+     # Optional adapter reset notification. Receives the one-dimensional int64
+     # tensor of environment indices after their hand positions/targets reset.
+     hand_state_reset_fn: Callable[[torch.Tensor], None] | None = None
+-    # Optional adapter checkpoint hooks for warm resume. Export returns the
+-    # adapter's evolving cross-step state (CPU tensor dict) or None; import
+-    # receives exactly what export returned when the checkpoint was written.
+-    hand_state_export_fn: Callable[[], dict | None] | None = None
+-    hand_state_import_fn: Callable[[dict | None], None] | None = None
+ 
+ 
+ # ----------------------------------------------------------------------------
+@@ -472,6 +462,8 @@ class TerminationCfg:
+     tolerance_curriculum_increment: float = 0.9  # multiplicative per step
+     tolerance_curriculum_interval: int = 3000  # env steps across all agents
+     tolerance_curriculum_success_threshold: float = 3.0
++    # Frames (env steps x num_envs) at fixed success_tolerance before the curriculum may tighten it.
++    tolerance_curriculum_start_frames: int = 0
+ 
+ 
+ # ----------------------------------------------------------------------------
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
+index dc29c103..442fa833 100644
+--- a/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
++++ b/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
+@@ -56,10 +56,6 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
+     if replay_target is not None:
+         env._cur_targets[:] = replay_target
+         env._prev_targets = env._cur_targets.clone()
+-        if env._slow_hand_targets is not None:
+-            env._slow_hand_targets.copy_(
+-                replay_target[:, env._hand_joint_ids]
+-            )
+         return
+ 
+     dr = env.cfg.domain_randomization
+@@ -105,32 +101,10 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
+         env._hand_upper,
+         act_cfg.hand_action_transform,
+     )
+-    previous_slow_hand_targets = prev_hand_targets
+-    if env._slow_hand_targets is not None:
+-        previous_slow_hand_targets = env._slow_hand_targets
+     hand_smoothed = (
+         act_cfg.hand_moving_average * hand_raw
+-        + (1.0 - act_cfg.hand_moving_average) * previous_slow_hand_targets
++        + (1.0 - act_cfg.hand_moving_average) * prev_hand_targets
+     )
+-    if act_cfg.hand_fast_offset_transform is not None:
+-        if env._slow_hand_targets is None:
+-            raise RuntimeError("fast-offset control requires slow-target state")
+-        fast_offset = act_cfg.hand_fast_offset_transform(hand_action)
+-        if fast_offset.shape != hand_smoothed.shape:
+-            raise ValueError(
+-                "hand_fast_offset_transform must return shape "
+-                f"{tuple(hand_smoothed.shape)}, got {tuple(fast_offset.shape)}"
+-            )
+-        if (
+-            fast_offset.device != hand_smoothed.device
+-            or fast_offset.dtype != hand_smoothed.dtype
+-        ):
+-            raise ValueError(
+-                "hand_fast_offset_transform output device/dtype must match "
+-                "the hand target"
+-            )
+-        env._slow_hand_targets.copy_(hand_smoothed)
+-        hand_smoothed = hand_smoothed + fast_offset
+     hand_smoothed = torch.clamp(hand_smoothed, env._hand_lower, env._hand_upper)
+ 
+     # Write Lab-order targets and cache them for the next step.
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
+index 5c8dabe5..6e23893f 100644
+--- a/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
++++ b/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
+@@ -78,15 +78,6 @@ def allocate_state_buffers(env) -> None:
+     num_joints = len(lab_names)
+     env._cur_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
+     env._prev_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
+-    env._slow_hand_targets = (
+-        torch.zeros(
+-            env.num_envs,
+-            len(env._hand_joint_ids),
+-            device=env.device,
+-        )
+-        if env.cfg.action.hand_fast_offset_transform is not None
+-        else None
+-    )
+ 
+     # --- Keypoint offsets in object local frame ---
+     corners = torch.tensor(
+@@ -240,8 +231,6 @@ def _randomize_robot_dof_state(env, env_ids: torch.Tensor) -> None:
+     env.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+     env._prev_targets[env_ids] = joint_pos
+     env._cur_targets[env_ids] = joint_pos
+-    if env._slow_hand_targets is not None:
+-        env._slow_hand_targets[env_ids] = joint_pos[:, env._hand_joint_ids]
+ 
+ 
+ def _reset_table_pose(env, env_ids: torch.Tensor) -> None:
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
+index 4851d421..6f385b04 100644
+--- a/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
++++ b/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
+@@ -47,7 +47,6 @@ _BUFFER_NAMES = (
+ 
+ # Buffers that only exist for some configurations / task variants.
+ _OPTIONAL_BUFFER_NAMES = (
+-    "_slow_hand_targets",
+     "_traj_id",
+     "_traj_step",
+     "_student_camera_queue",
+@@ -86,7 +85,6 @@ def get_env_state(env) -> dict | None:
+         ),
+     }
+ 
+-    export_fn = env.cfg.action.hand_state_export_fn
+     return {
+         "schema": ENV_STATE_SCHEMA,
+         "num_envs": int(env.num_envs),
+@@ -100,7 +98,6 @@ def get_env_state(env) -> dict | None:
+         },
+         "sim": sim,
+         "rng": rng,
+-        "hand_transform": None if export_fn is None else export_fn(),
+     }
+ 
+ 
+@@ -175,12 +172,6 @@ def set_env_state(env, state: dict | None) -> None:
+     if rng["torch_cuda"] is not None:
+         torch.cuda.set_rng_state(rng["torch_cuda"], device)
+ 
+-    import_fn = env.cfg.action.hand_state_import_fn
+-    if import_fn is not None:
+-        if "hand_transform" not in state:
+-            raise ValueError("env_state is missing the hand_transform payload")
+-        import_fn(state["hand_transform"])
+-
+     # Post-resume diagnostics window: the env prints per-step reset counts and
+     # commanded-target deltas for the first few steps after a warm restore.
+     env._warm_resume_log_steps = 3
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
+index 4960d133..039ee8cc 100644
+--- a/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
++++ b/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
+@@ -11,7 +11,8 @@ def update_tolerance_curriculum(env) -> None:
+     """Shrink success tolerance when completed episodes average enough goals."""
+     env._frame_counter += 1
+     term = env.cfg.termination
+-    if env._frame_counter - env._last_curriculum_update >= term.tolerance_curriculum_interval:
++    curriculum_open = env._frame_counter * env.num_envs >= term.tolerance_curriculum_start_frames
++    if curriculum_open and env._frame_counter - env._last_curriculum_update >= term.tolerance_curriculum_interval:
+         successes = env._prev_episode_successes.float()
+         eligible_mask = None
+         if hasattr(env, "_curriculum_eligible_mask"):
+diff --git a/isaacsimenvs/train.py b/isaacsimenvs/train.py
+index 0eca1a1c..b0419f3f 100644
+--- a/isaacsimenvs/train.py
++++ b/isaacsimenvs/train.py
+@@ -49,12 +49,6 @@ def main() -> None:
+     # --- Runtime toggles ---
+     parser.add_argument("--test", action="store_true", help="Run inference (player) instead of training")
+     parser.add_argument("--checkpoint", default=None, help="Path to .pth to restore")
+-    parser.add_argument(
+-        "--checkpoint_load_mode",
+-        choices=("resume", "weights"),
+-        default="resume",
+-        help="resume restores optimizer/rollout/env state; weights starts fresh from model weights.",
+-    )
+     parser.add_argument("--rl_device", default="cuda:0")
+     parser.add_argument("--sim_device", default="cuda:0")
+     # --- Video ---
+@@ -135,12 +129,22 @@ def main() -> None:
+         # (~400 GB at 24576 envs) and OOM'd the slurm cgroup. The Lab-
+         # canonical pattern is render_mode + gym.wrappers.RecordVideo (see
+         # IsaacLab tests/test_record_video.py).
++        action_bench_adapter = None
++        study_path = os.environ.get("ACTION_BENCH_STUDY")
++        if study_path:
++            from action_bench.benchmarks.simtoolreal.integration import configure_training
++            action_bench_adapter = configure_training(env_cfg, agent_cfg, study_path)
++
+         env = gym.make(
+             args_cli.task,
+             cfg=env_cfg,
+             render_mode="rgb_array" if args_cli.capture_video else None,
+         )
+ 
++        if action_bench_adapter is not None:
++            from action_bench.benchmarks.simtoolreal.integration import validate_environment
++            validate_environment(env, action_bench_adapter)
++
+         if args_cli.capture_video:
+             from pathlib import Path
+ 
+@@ -174,6 +178,15 @@ def main() -> None:
+         # matches isaacgymenvs's `cfg["env"].get("clipObservations", np.Inf)`.
+         clip_obs = float(agent_cfg["params"]["env"].get("clip_observations", math.inf))
+         clip_actions = float(agent_cfg["params"]["env"].get("clip_actions", math.inf))
++        capture = None
++        capture_observer = None
++        record_dir = os.environ.get("ACTION_BENCH_RECORD_DIR")
++        if record_dir:
++            from pathlib import Path
++            from action_bench.benchmarks.simtoolreal.capture import configure_recording
++            env, capture_observer, capture = configure_recording(
++                env, EnvStatsAlgoObserver(), record_dir, Path(__file__).resolve().parents[1]
++            )
+         register_rlgames_env(
+             env,
+             rl_device=args_cli.rl_device,
+@@ -181,7 +194,7 @@ def main() -> None:
+             clip_actions=clip_actions,
+         )
+ 
+-        observers = [EnvStatsAlgoObserver()]
++        observers = [capture_observer if capture_observer is not None else EnvStatsAlgoObserver()]
+         if args_cli.wandb_activate:
+             from isaacsimenvs.utils.wandb_utils import WandbAlgoObserver
+ 
+@@ -211,14 +224,17 @@ def main() -> None:
+ 
+         runner.load(agent_cfg)
+         runner.reset()
+-        runner.run(
+-            {
+-                "train": not args_cli.test,
+-                "play": args_cli.test,
+-                "checkpoint": args_cli.checkpoint,
+-                "checkpoint_load_mode": args_cli.checkpoint_load_mode,
+-            }
+-        )
++        try:
++            runner.run(
++                {
++                    "train": not args_cli.test,
++                    "play": args_cli.test,
++                    "checkpoint": args_cli.checkpoint,
++                }
++            )
++        finally:
++            if capture is not None:
++                capture.close()
+ 
+     run()
+ 

@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Machine-specific notes and editor settings.
+AGENTS.local.md
+.vscode/
+.claude/
+
+# Generated research data and outputs stay outside /home.
+/artifacts/
+/datasets/
+/runs/

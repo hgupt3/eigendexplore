@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "name": "oakinkv2_right_10task_v1",
+  "dataset_name": "oakinkv2",
+  "embodiment_type": "right",
+  "evaluation_scope": "right-hand tracked-object retargeting",
+  "source_fps": 120,
+  "target_fps": 50,
+  "pre_seconds": 1.5,
+  "post_seconds": 2.5,
+  "robot_hands": [
+    "sharpa",
+    "allegro",
+    "xhand",
+    "inspire",
+    "schunk",
+    "wuji"
+  ],
+  "tasks": {
+    "pick_spoon_bowl": {
+      "sequence": "scene_01__A001++seq__b29ee6fc3a226cd716ec__2023-04-27-19-39-19",
+      "object": "O02@0030@00002",
+      "primitive": "scoop",
+      "primitive_start": 1111,
+      "window": [931, 1411],
+      "source_role": "right hand manipulates spoon; left-supporting bowl is omitted"
+    },
+    "pour_tube": {
+      "sequence": "scene_03__A004++seq__f2d09be48f383f8caf97__2023-04-22-18-52-52",
+      "object": "O02@0011@00003",
+      "primitive": "hold",
+      "primitive_start": 1191,
+      "window": [1011, 1491],
+      "source_role": "selected right-hand primitive holds the beaker"
+    },
+    "stir_beaker": {
+      "sequence": "scene_01__A005++seq__65ef09f4bf2106cb735d__2023-04-24-20-20-31",
+      "object": "O02@0033@00001",
+      "primitive": "stir",
+      "primitive_start": 8047,
+      "window": [7867, 8347],
+      "source_role": "right hand manipulates stirring rod; left-supporting cup is omitted"
+    },
+    "wipe_board": {
+      "sequence": "scene_02__A007++seq__eb5f919d73a9ac759146__2023-04-20-14-20-06",
+      "object": "O02@0055@00002",
+      "primitive": "brush_whiteboard",
+      "primitive_start": 867,
+      "window": [687, 1167],
+      "source_role": "right hand manipulates brush/eraser; board is omitted"
+    },
+    "uncap_alcohol_burner": {
+      "sequence": "scene_03__A007++seq__2bae9f0f317c19cd1b5d__2023-05-15-20-32-31",
+      "object": "O02@0206@00001",
+      "primitive": "uncap_alcohol_lamp",
+      "primitive_start": 9187,
+      "window": [9007, 9487],
+      "source_role": "right hand manipulates cap; left-supporting burner body is omitted"
+    },
+    "rearrange_blue_cup": {
+      "sequence": "scene_01__A005++seq__292669123693a19994f3__2023-04-24-20-08-10",
+      "object": "C11001",
+      "primitive": "rearrange",
+      "primitive_start": 756,
+      "window": [576, 1056]
+    },
+    "rearrange_pencil": {
+      "sequence": "scene_02__A001++seq__1c29fc5cfe3b18c6b6ea__2023-04-22-16-25-53",
+      "object": "O02@0029@00007",
+      "primitive": "rearrange",
+      "primitive_start": 5548,
+      "window": [5368, 5848]
+    },
+    "rearrange_toothbrush": {
+      "sequence": "scene_04__A008++seq__ff070467cd91f735acab__2023-04-23-11-28-29",
+      "object": "O02@0025@00001",
+      "primitive": "rearrange",
+      "primitive_start": 547,
+      "window": [367, 847]
+    },
+    "shake_conical_flask": {
+      "sequence": "scene_03__A007++seq__606948d0c32e5f88cab5__2023-04-20-15-20-17",
+      "object": "O02@0011@00002",
+      "primitive": "shake_lab_container",
+      "primitive_start": 3669,
+      "window": [3489, 3969]
+    },
+    "pour_tall_blue_mug": {
+      "sequence": "scene_01__A008++seq__4e9026b0a29d85b995ae__2023-05-09-18-37-48",
+      "object": "S10021",
+      "primitive": "pour",
+      "primitive_start": 634,
+      "window": [454, 934]
+    }
+  }
+}

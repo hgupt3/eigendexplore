@@ -1,0 +1,20 @@
+schema_version: 2
+hands:
+  allegro:
+    artifact_id: allegro_egosuite_6hz_v1_pca
+    k: 10
+  inspire:
+    artifact_id: inspire_egosuite_6hz_v1_pca
+    k: 3
+  schunk:
+    artifact_id: schunk_egosuite_6hz_v1_pca
+    k: 5
+  sharpa:
+    artifact_id: sharpa_egosuite_6hz_v1_pca
+    k: 9
+  wuji:
+    artifact_id: wuji_egosuite_6hz_v1_pca
+    k: 9
+  xhand:
+    artifact_id: xhand_egosuite_6hz_v1_pca
+    k: 6
