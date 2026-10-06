@@ -1,0 +1,839 @@
+diff --git a/examples/run_mjwp.py b/examples/run_mjwp.py
+index ce6a506..561b194 100644
+--- a/examples/run_mjwp.py
++++ b/examples/run_mjwp.py
+@@ -14,6 +14,8 @@ Date: 2025-08-11
+ 
+ from __future__ import annotations
+ 
++import json
++import math
+ import sys
+ import time
+ from dataclasses import fields
+@@ -37,11 +39,11 @@ from spider.config import (
+ from spider.interp import get_slice
+ from spider.io import load_data
+ from spider.optimizers.sampling import (
++    evaluate_control_center,
+     make_optimize_fn,
+     make_optimize_once_fn,
+     make_rollout_fn,
+ )
+-from spider.postprocess.get_success_rate import compute_object_tracking_error
+ from spider.simulators.mjwp import (
+     _initial_state_sanity_check,
+     compute_contact_point_delta,
+@@ -128,6 +130,8 @@ def _assert_object_actuator_gains_zero(
+ 
+ 
+ def _normalize_yaml_value(value):
++    if OmegaConf.is_config(value):
++        return OmegaConf.to_container(value, resolve=True)
+     if isinstance(value, torch.Tensor):
+         return value.detach().cpu().tolist()
+     if isinstance(value, np.ndarray):
+@@ -139,6 +143,17 @@ def _normalize_yaml_value(value):
+     return value
+ 
+ 
++def _json_safe(value):
++    value = _normalize_yaml_value(value)
++    if isinstance(value, dict):
++        return {key: _json_safe(item) for key, item in value.items()}
++    if isinstance(value, list):
++        return [_json_safe(item) for item in value]
++    if isinstance(value, float) and not math.isfinite(value):
++        return None
++    return value
++
++
+ def _save_config_yaml(config: Config) -> None:
+     if not config.save_config:
+         return
+@@ -155,6 +170,16 @@ def _save_config_yaml(config: Config) -> None:
+     loguru.logger.info(f"Saved config to {output_path}")
+ 
+ 
++
++
++
++
++
++
++
++
++
++
+ def _get_bimanual_hand_indices(config: Config) -> tuple[list[int], list[int]]:
+     robot_nu = int(config.nu)
+     if config.contact_guidance:
+@@ -180,6 +205,100 @@ def _apply_noise_mask(
+     return noise_scale
+ 
+ 
++_EXECUTION_TRACE_KEYS = {
++    "qpos",
++    "qvel",
++    "time",
++    "ctrl",
++    "executed_physics_reward",
++    "executed_physics_cost",
++    "executed_reference_index",
++}
++
++
++def _terminal_execution_steps(
++    *, sim_step: int, max_sim_steps: int, ctrl_steps: int
++) -> int:
++    """Return the exact executable prefix of an already-optimized plan."""
++
++    if sim_step < 0 or max_sim_steps <= 0 or ctrl_steps <= 0:
++        raise ValueError("terminal execution bounds must be positive")
++    remaining = max_sim_steps - sim_step
++    if remaining <= 0:
++        return 0
++    return min(ctrl_steps, remaining)
++
++
++def _aggregate_run_info(info_list: list[dict]) -> dict[str, np.ndarray]:
++    """Stack optimizer state traces and concatenate variable execution blocks."""
++
++    if not info_list:
++        return {}
++    keys = set(info_list[0])
++    if any(set(info) != keys for info in info_list[1:]):
++        raise ValueError("per-commit run info keys differ")
++    aggregated: dict[str, np.ndarray] = {}
++    for key in sorted(keys):
++        values = [np.asarray(info[key]) for info in info_list]
++        aggregated[key] = (
++            np.concatenate(values, axis=0)
++            if key in _EXECUTION_TRACE_KEYS
++            else np.stack(values, axis=0)
++        )
++    return aggregated
++
++
++def _executed_physics_cost_summary(
++    info_list: list[dict], *, max_sim_steps: int
++) -> dict[str, object]:
++    """Summarize stock reward terms over the exact executed episode."""
++
++    costs = np.concatenate(
++        [np.asarray(info["executed_physics_cost"], dtype=np.float64) for info in info_list]
++    )
++    rewards = np.concatenate(
++        [
++            np.asarray(info["executed_physics_reward"], dtype=np.float64)
++            for info in info_list
++        ]
++    )
++    reference_indices = np.concatenate(
++        [
++            np.asarray(info["executed_reference_index"], dtype=np.int64)
++            for info in info_list
++        ]
++    )
++    expected_indices = np.arange(1, max_sim_steps + 1, dtype=np.int64)
++    if (
++        costs.shape != (max_sim_steps,)
++        or rewards.shape != (max_sim_steps,)
++        or not np.array_equal(reference_indices, expected_indices)
++        or not np.isfinite(costs).all()
++        or not np.isfinite(rewards).all()
++        or not np.allclose(costs, -rewards, rtol=0.0, atol=1.0e-12)
++    ):
++        raise ValueError("executed full-episode physics-cost trace is inconsistent")
++    return {
++        "final_full_physics_cost": float(costs.mean()),
++        "final_full_physics_cost_sum": float(costs.sum()),
++        "final_full_physics_cost_aggregation": (
++            "arithmetic_mean_of_stock_step_cost_over_exact_executed_episode"
++        ),
++        "final_full_physics_cost_step_count": int(costs.size),
++        "final_full_physics_cost_per_step": costs.tolist(),
++        "final_full_physics_cost_reference_indices": reference_indices.tolist(),
++        "final_full_physics_cost_terms": (
++            "negative stock get_reward at each executed state; exact final state "
++            "uses stock get_terminal_reward"
++        ),
++    }
++
++
++def build_control_proposal_augmenter(config, model):
++    """Action-Bench installs the Eigen hook; IID uses native proposals."""
++    return None
++
++
+ def main(config: Config):
+     """Run the SPIDER using MuJoCo Warp backend"""
+     # process config, set defaults and derived fields
+@@ -360,6 +479,7 @@ def main(config: Config):
+             env_params.append(params)
+         env_params_list.append(env_params)
+     config.env_params_list = env_params_list
++    proposal_augmenter = build_control_proposal_augmenter(config, mj_model)
+     _save_config_yaml(config)
+ 
+     # setup viewer and renderer
+@@ -379,8 +499,13 @@ def main(config: Config):
+         load_env_params,
+         copy_sample_state,
+     )
+-    optimize_once = make_optimize_once_fn(rollout)
+-    optimize = make_optimize_fn(optimize_once)
++    optimize_once = make_optimize_once_fn(rollout, proposal_augmenter)
++    optimize = make_optimize_fn(
++        optimize_once,
++        lambda config, env, ctrls, ref_slice, env_params: evaluate_control_center(
++            rollout, config, env, ctrls, ref_slice, env_params
++        ),
++    )
+     base_noise_scale = config.noise_scale.clone()
+     gibbs_enabled = config.gibbs_sampling and config.embodiment_type == "bimanual"
+     if config.gibbs_sampling and not gibbs_enabled:
+@@ -406,6 +531,18 @@ def main(config: Config):
+ 
+             # optimize using future reference window at control-rate (+1 lookahead)
+             sim_step = int(np.round(mj_data.time / config.sim_dt))
++            execute_steps = _terminal_execution_steps(
++                sim_step=sim_step,
++                max_sim_steps=config.max_sim_steps,
++                ctrl_steps=config.ctrl_steps,
++            )
++            if execute_steps == 0:
++                if sim_step != config.max_sim_steps:
++                    raise RuntimeError(
++                        "SPIDER reached an invalid terminal execution state: "
++                        f"{sim_step}/{config.max_sim_steps}"
++                    )
++                break
+             ref_slice = get_slice(
+                 ref_data, sim_step + 1, sim_step + config.horizon_steps + 1
+             )
+@@ -479,9 +616,17 @@ def main(config: Config):
+                 trace_ref_np = np.stack(trace_ref, axis=0)[None, None, :, :, :]
+                 infos["trace_ref"] = trace_ref_np
+ 
+-            # step environment for ctrl_steps
+-            step_info = {"qpos": [], "qvel": [], "time": [], "ctrl": []}
+-            for i in range(config.ctrl_steps):
++            # Execute only the valid prefix of the already-optimized plan.
++            step_info = {
++                "qpos": [],
++                "qvel": [],
++                "time": [],
++                "ctrl": [],
++                "executed_physics_reward": [],
++                "executed_physics_cost": [],
++                "executed_reference_index": [],
++            }
++            for i in range(execute_steps):
+                 ctrl_step = ctrls[i]
+ 
+                 # option 1: use mujoco step
+@@ -493,17 +638,29 @@ def main(config: Config):
+                 mj_data.qvel[:] = get_qvel(config, env)[0].detach().cpu().numpy()
+                 mj_data.ctrl[:] = ctrl_step.detach().cpu().numpy()
+                 mj_data.time += config.sim_dt
++                reference_index = sim_step + i + 1
++                execution_ref = tuple(
++                    reference[reference_index] for reference in ref_data
++                )
++                executed_reward, _ = (
++                    get_terminal_reward(config, env, execution_ref)
++                    if reference_index == config.max_sim_steps
++                    else get_reward(config, env, execution_ref)
++                )
++                executed_reward_world0 = float(
++                    executed_reward[0].detach().cpu()
++                )
+                 if config.save_video and renderer is not None:
+                     if i % int(np.round(config.render_dt / config.sim_dt)) == 0:
+                         mj_data_ref.qpos[:] = (
+-                            qpos_ref[sim_step + i].detach().cpu().numpy()
++                            qpos_ref[reference_index].detach().cpu().numpy()
+                         )
+                         image = render_image(
+                             config, renderer, mj_model, mj_data, mj_data_ref
+                         )
+                         images.append(image)
+                 if "rerun" in config.viewer or "viser" in config.viewer:
+-                    mj_data_ref.qpos[:] = qpos_ref[sim_step + i].detach().cpu().numpy()
++                    mj_data_ref.qpos[:] = qpos_ref[reference_index].detach().cpu().numpy()
+                     mujoco.mj_kinematics(mj_model, mj_data_ref)
+                     log_frame(
+                         mj_data,
+@@ -515,21 +672,36 @@ def main(config: Config):
+                 step_info["qvel"].append(mj_data.qvel.copy())
+                 step_info["time"].append(mj_data.time)
+                 step_info["ctrl"].append(mj_data.ctrl.copy())
++                step_info["executed_physics_reward"].append(
++                    executed_reward_world0
++                )
++                step_info["executed_physics_cost"].append(
++                    -executed_reward_world0
++                )
++                step_info["executed_reference_index"].append(reference_index)
+             for k in step_info:
+                 step_info[k] = np.stack(step_info[k], axis=0)
++            infos["executed_steps"] = np.asarray([execute_steps], dtype=np.int64)
+             infos.update(step_info)
+             # sync env state
+             sync_env(config, env, mj_data)
+ 
+             # receding horizon update
+             sim_step = int(np.round(mj_data.time / config.sim_dt))
+-            prev_ctrl = ctrls[config.ctrl_steps :]
+-            new_ctrl = ctrl_ref[
+-                sim_step + prev_ctrl.shape[0] : sim_step
+-                + prev_ctrl.shape[0]
+-                + config.ctrl_steps
+-            ]
+-            ctrls = torch.cat([prev_ctrl, new_ctrl], dim=0)
++            if sim_step > config.max_sim_steps:
++                raise RuntimeError(
++                    "SPIDER executed past the exact episode boundary: "
++                    f"{sim_step}>{config.max_sim_steps}"
++                )
++            terminal_commit = sim_step == config.max_sim_steps
++            if not terminal_commit:
++                prev_ctrl = ctrls[config.ctrl_steps :]
++                new_ctrl = ctrl_ref[
++                    sim_step + prev_ctrl.shape[0] : sim_step
++                    + prev_ctrl.shape[0]
++                    + config.ctrl_steps
++                ]
++                ctrls = torch.cat([prev_ctrl, new_ctrl], dim=0)
+ 
+             # sync viewer state and render
+             mj_data.qpos[:] = get_qpos(config, env)[0].detach().cpu().numpy()
+@@ -549,7 +721,7 @@ def main(config: Config):
+             # rule out "trace"
+             info_list.append({k: v for k, v in infos.items() if k != "trace_sample"})
+ 
+-            if sim_step >= config.max_sim_steps:
++            if terminal_commit:
+                 break
+ 
+         t_end = time.perf_counter()
+@@ -557,9 +729,7 @@ def main(config: Config):
+ 
+     # save retargeted trajectory
+     if config.save_info and len(info_list) > 0:
+-        info_aggregated = {}
+-        for k in info_list[0].keys():
+-            info_aggregated[k] = np.stack([info[k] for info in info_list], axis=0)
++        info_aggregated = _aggregate_run_info(info_list)
+         np.savez(
+             f"{config.output_dir}/trajectory_mjwp{'_act' if config.contact_guidance else ''}.npz",
+             **info_aggregated,
+@@ -578,19 +748,24 @@ def main(config: Config):
+         )
+         loguru.logger.info(f"Saved video to {video_path}")
+ 
+-    errors = None
+-    if info_list:
+-        qpos_traj = np.concatenate([info["qpos"] for info in info_list], axis=0)
+-        qpos_ref_np = qpos_ref[: qpos_traj.shape[0]].detach().cpu().numpy()
+-        data_type = "mjwp_act" if config.contact_guidance else "mjwp"
+-        errors = compute_object_tracking_error(
+-            qpos_traj, qpos_ref_np, config.embodiment_type, data_type
+-        )
+-        loguru.logger.info(
+-            "Final object tracking error: pos={:.4f}, quat={:.4f}",
+-            errors["obj_pos_err"],
+-            errors["obj_quat_err"],
+-        )
++    optimizer_iterations = [int(info["opt_steps"][0]) for info in info_list]
++    summary = {
++        "completed": sim_step == config.max_sim_steps,
++        "sim_step": sim_step,
++        "max_sim_steps": config.max_sim_steps,
++        "generated_frames": sum(len(info["ctrl"]) for info in info_list),
++        "wall_seconds": t_end - t_start,
++        "optimizer_iterations": sum(optimizer_iterations),
++        "optimizer_iterations_per_commit": optimizer_iterations,
++        "terminal_rebase_performed": False,
++        "proposal_center_max_abs_error": max(float(info["proposal_center_max_abs_error"].max()) for info in info_list),
++        **_executed_physics_cost_summary(info_list, max_sim_steps=config.max_sim_steps),
++    }
++    summary_path = Path(config.output_dir) / "run_summary.json"
++    summary_path.write_text(
++        json.dumps(_json_safe(summary), indent=2) + "\n", encoding="utf-8"
++    )
++    loguru.logger.info(f"Saved run summary to {summary_path}")
+ 
+     _assert_object_actuator_gains_zero(env, config, "end")
+ 
+@@ -604,7 +779,7 @@ def main(config: Config):
+         except KeyboardInterrupt:
+             pass
+ 
+-    return errors
++    return summary
+ 
+ 
+ @hydra.main(version_base=None, config_path="config", config_name="default")
+diff --git a/spider/config.py b/spider/config.py
+index 5354fb3..4c99e47 100644
+--- a/spider/config.py
++++ b/spider/config.py
+@@ -194,6 +194,7 @@ class Config:
+     env_params_list: list = field(default_factory=list)
+     viewer_body_entity_and_ids: list = field(default_factory=list)
+     output_dir: str = ""
++    run_output_dir: str = ""
+ 
+ 
+ def resolve_object_actuator_ids(
+@@ -497,7 +498,7 @@ def process_config(config: Config):
+     config = compute_noise_schedule(config)
+ 
+     # output dir: write artifacts alongside the trial
+-    config.output_dir = processed_dir_robot
++    config.output_dir = os.path.abspath(os.path.expanduser(config.run_output_dir)) if config.run_output_dir else processed_dir_robot
+     os.makedirs(config.output_dir, exist_ok=True)
+ 
+     # read task info
+@@ -512,6 +513,7 @@ def process_config(config: Config):
+         task_info = {}
+     if "ref_dt" in task_info:
+         config.ref_dt = task_info["ref_dt"]
++        config.ref_steps = int(np.round(config.ref_dt / config.sim_dt))
+         loguru.logger.info(f"overriding ref_dt: {config.ref_dt} from task_info.json")
+ 
+     # override contact site ids
+diff --git a/spider/io.py b/spider/io.py
+index a41f1a2..e549d71 100644
+--- a/spider/io.py
++++ b/spider/io.py
+@@ -16,6 +16,7 @@ import os
+ from typing import TYPE_CHECKING
+ 
+ import loguru
++import mujoco
+ import numpy as np
+ import torch
+ 
+@@ -25,6 +26,130 @@ if TYPE_CHECKING:
+     from spider.config import Config
+ 
+ 
++def free_joint_quaternion_slices(model: mujoco.MjModel) -> tuple[slice, ...]:
++    """Return the qpos quaternion slice for every free joint in ``model``."""
++    slices = []
++    for joint_id in range(model.njnt):
++        if model.jnt_type[joint_id] != mujoco.mjtJoint.mjJNT_FREE:
++            continue
++        qpos_address = int(model.jnt_qposadr[joint_id])
++        slices.append(slice(qpos_address + 3, qpos_address + 7))
++    return tuple(slices)
++
++
++def validate_free_joint_qpos_numpy(
++    qpos: np.ndarray,
++    model: mujoco.MjModel,
++    *,
++    context: str,
++    tolerance: float = 1e-6,
++) -> None:
++    """Fail unless every free-joint quaternion is unit and sign-continuous."""
++    values = np.asarray(qpos)
++    if values.ndim != 2 or values.shape[1] != model.nq:
++        raise ValueError(
++            f"{context} qpos must have shape (T, {model.nq}), got {values.shape}"
++        )
++    if not np.isfinite(values).all():
++        raise ValueError(f"{context} qpos contains non-finite values")
++    if not np.isfinite(tolerance) or tolerance <= 0.0:
++        raise ValueError("quaternion validation tolerance must be positive and finite")
++
++    for quat_slice in free_joint_quaternion_slices(model):
++        quaternions = values[:, quat_slice]
++        norm_error = np.abs(np.linalg.norm(quaternions, axis=1) - 1.0)
++        if np.any(norm_error > tolerance):
++            raise ValueError(
++                f"{context} contains a non-unit free-joint quaternion "
++                f"(max norm error {float(norm_error.max()):.3g})"
++            )
++        if len(quaternions) > 1:
++            adjacent_dots = np.sum(quaternions[1:] * quaternions[:-1], axis=1)
++            if np.any(adjacent_dots < -tolerance):
++                raise ValueError(
++                    f"{context} contains an antipodal free-joint transition "
++                    f"(minimum adjacent dot {float(adjacent_dots.min()):.3g})"
++                )
++
++
++def _normalize_unwrap_free_joint_qpos_torch(
++    qpos: torch.Tensor,
++    model: mujoco.MjModel,
++    *,
++    context: str,
++) -> torch.Tensor:
++    if qpos.ndim != 2 or qpos.shape[1] != model.nq:
++        raise ValueError(
++            f"{context} qpos must have shape (T, {model.nq}), got {tuple(qpos.shape)}"
++        )
++    if not bool(torch.isfinite(qpos).all()):
++        raise ValueError(f"{context} qpos contains non-finite values")
++
++    result = qpos.clone()
++    for quat_slice in free_joint_quaternion_slices(model):
++        quaternions = result[:, quat_slice]
++        norms = torch.linalg.vector_norm(quaternions, dim=1)
++        if bool(torch.any(norms <= 1e-12)):
++            raise ValueError(f"{context} contains a zero-norm free-joint quaternion")
++        quaternions = quaternions / norms[:, None]
++        if len(quaternions) > 1:
++            pair_sign = torch.where(
++                torch.sum(quaternions[1:] * quaternions[:-1], dim=1) < 0.0,
++                -torch.ones((), dtype=qpos.dtype, device=qpos.device),
++                torch.ones((), dtype=qpos.dtype, device=qpos.device),
++            )
++            signs = torch.cat(
++                [
++                    torch.ones(1, dtype=qpos.dtype, device=qpos.device),
++                    torch.cumprod(pair_sign, dim=0),
++                ]
++            )
++            quaternions = quaternions * signs[:, None]
++        result[:, quat_slice] = quaternions
++    return result
++
++
++def _validate_free_joint_qpos_torch(
++    qpos: torch.Tensor,
++    model: mujoco.MjModel,
++    *,
++    context: str,
++    tolerance: float = 1e-6,
++) -> None:
++    if qpos.ndim != 2 or qpos.shape[1] != model.nq:
++        raise ValueError(
++            f"{context} qpos must have shape (T, {model.nq}), got {tuple(qpos.shape)}"
++        )
++    if not bool(torch.isfinite(qpos).all()):
++        raise ValueError(f"{context} qpos contains non-finite values")
++    for quat_slice in free_joint_quaternion_slices(model):
++        quaternions = qpos[:, quat_slice]
++        norm_error = torch.abs(torch.linalg.vector_norm(quaternions, dim=1) - 1.0)
++        if bool(torch.any(norm_error > tolerance)):
++            raise ValueError(f"{context} contains a non-unit free-joint quaternion")
++        if len(quaternions) > 1:
++            adjacent_dots = torch.sum(
++                quaternions[1:] * quaternions[:-1], dim=1
++            )
++            if bool(torch.any(adjacent_dots < -tolerance)):
++                raise ValueError(f"{context} contains an antipodal free-joint transition")
++
++
++def interpolate_qpos_shortest_path(
++    qpos: torch.Tensor,
++    factor: int,
++    model: mujoco.MjModel,
++) -> torch.Tensor:
++    """Interpolate qpos with normalized shortest-path free-joint quaternions."""
++    if factor < 1:
++        raise ValueError("qpos interpolation factor must be positive")
++    _validate_free_joint_qpos_torch(qpos, model, context="input reference")
++    interpolated = interp(qpos.unsqueeze(0), factor).squeeze(0)
++    return _normalize_unwrap_free_joint_qpos_torch(
++        interpolated, model, context="interpolated reference"
++    )
++
++
+ def load_data(
+     config: Config,
+     data_path: str = "../datasets/inspire/bimanual_wipe.npz",
+@@ -63,6 +188,11 @@ def load_data(
+             ctrl_ref = qpos_ref[:, 7:]
+         else:
+             raise ValueError(f"Invalid embodiment_type: {config.embodiment_type}")
++    model_path = getattr(config, "model_path", "")
++    if not model_path:
++        raise ValueError("config.model_path is required to validate qpos quaternions")
++    model = mujoco.MjModel.from_xml_path(model_path)
++    validate_free_joint_qpos_numpy(qpos_ref, model, context="saved reference")
+     # move to device
+     qpos_ref_torch = torch.from_numpy(qpos_ref).to(config.device).to(torch.float32)
+     qvel_ref_torch = torch.from_numpy(qvel_ref).to(config.device).to(torch.float32)
+@@ -73,8 +203,8 @@ def load_data(
+     )
+     # interpolate to match sim_dt
+     if config.ref_dt > config.sim_dt:
+-        qpos_ref_interp = interp(qpos_ref_torch.unsqueeze(0), config.ref_steps).squeeze(
+-            0
++        qpos_ref_interp = interpolate_qpos_shortest_path(
++            qpos_ref_torch, config.ref_steps, model
+         )
+         qvel_ref_interp = interp(qvel_ref_torch.unsqueeze(0), config.ref_steps).squeeze(
+             0
+@@ -94,7 +224,11 @@ def load_data(
+     else:
+         # downsample
+         downsample_factor = int(config.sim_dt / config.ref_dt)
+-        qpos_ref_interp = qpos_ref_torch[::downsample_factor]
++        qpos_ref_interp = _normalize_unwrap_free_joint_qpos_torch(
++            qpos_ref_torch[::downsample_factor],
++            model,
++            context="downsampled reference",
++        )
+         qvel_ref_interp = qvel_ref_torch[::downsample_factor]
+         ctrl_ref_interp = ctrl_ref_torch[::downsample_factor]
+         contact_ref_interp = contact_ref_torch[::downsample_factor]
+diff --git a/spider/optimizers/sampling.py b/spider/optimizers/sampling.py
+index bdf3611..f9f55ca 100644
+--- a/spider/optimizers/sampling.py
++++ b/spider/optimizers/sampling.py
+@@ -244,185 +244,85 @@ else:
+     _compute_weights_compiled = _compute_weights_impl
+ 
+ 
+-def make_optimize_once_fn(
+-    rollout,
+-):
+-    def optimize_once(
+-        config: Config,
+-        env,
+-        ctrls: torch.Tensor,
+-        ref_slice: tuple[torch.Tensor, ...],
+-        env_params: list[dict] = [{}],
+-        sample_params: dict | None = None,
+-    ) -> torch.Tensor:
+-        """Single step optimization of the policy parameters using DIAL MPC, no annealing is involved
+-
+-        Args:
+-            config: Config
+-            graph: Warp graph
+-            model_wp: Warp model
+-            data_wp: Warp data
+-            ctrls: Control actions, shape (horizon_steps, num_actions)
+-
+-        Returns:
+-            Control actions, shape (horizon_steps, num_actions)
+-        """
+-        # sample ctrls
+-        ctrls_samples = sample_ctrls(
+-            config, ctrls, sample_params
+-        )  # (num_samples, horizon_steps, num_actions)
+-
+-        # rollout
+-        # domain randomization: pick the minimum reward across all DR parameter sets
+-        min_rew = torch.full((config.num_samples,), float("inf"), device=config.device)
++def evaluate_control_center(rollout, config, env, ctrls, ref_slice, env_params):
++    costs = []
++    for env_param in env_params:
++        samples = ctrls.unsqueeze(0).expand(config.num_samples, -1, -1).clone()
++        _, rewards, _, info = rollout(config, env, samples, ref_slice, env_param)
++        finite = torch.isfinite(rewards)
++        # Original validity mask also includes physical object errors. With the
++        # stock reward, nonfinite pose differences already make reward nonfinite.
++        if int((~finite).sum()) > max(1, config.num_samples // 100):
++            raise ValueError("center evaluation exceeded nonfinite-world budget")
++        values = rewards[finite].sort().values
++        mid = len(values) // 2
++        median = (
++            values[mid] if len(values) % 2 else 0.5 * (values[mid - 1] + values[mid])
++        )
++        costs.append(-float(median))
++    return max(costs)
++
++
++def make_optimize_once_fn(rollout, proposal_augmenter=None):
++    def optimize_once(config, env, ctrls, ref_slice, env_params, sample_params):
++        samples = sample_ctrls(config, ctrls, sample_params)
++        if proposal_augmenter is not None:
++            samples = proposal_augmenter(config, ctrls, samples, sample_params).controls
++        center_error = float((samples[0] - ctrls).abs().max())
++        if center_error != 0:
++            raise ValueError("native zero-noise center particle was modified")
++        rewards = torch.full((config.num_samples,), float("inf"), device=config.device)
+         for env_param in env_params:
+-            ctrls_samples, rews, terminate, rollout_info = rollout(
+-                config,
+-                env,
+-                ctrls_samples,
+-                ref_slice,
+-                env_param,
+-            )
+-            min_rew = torch.minimum(min_rew, rews)
+-        # Use worst-case rewards across DR parameter sets
+-        rews = min_rew
+-
+-        # resample based on terminate condition
+-
+-        # Compute weights using compiled or non-compiled version
+-        if config.use_torch_compile:
+-            weights, nan_mask = _compute_weights_compiled(
+-                rews, config.num_samples, config.temperature
+-            )
+-        else:
+-            weights, nan_mask = _compute_weights_impl(
+-                rews, config.num_samples, config.temperature
++            samples, current, terminate, info = rollout(
++                config, env, samples, ref_slice, env_param
+             )
+-
+-        if nan_mask.any():
+-            loguru.logger.warning(
+-                f"NaNs or infs in rews: {nan_mask.sum()}/{config.num_samples}"
+-            )
+-
+-        ctrls_mean = (weights[:, None, None] * ctrls_samples).sum(dim=0)
+-
+-        # down sample traces by selecting topk and uniform samples for visualization
+-        n_uni = max(0, min(config.num_trace_uniform_samples, config.num_samples))
+-        n_topk = max(0, min(config.num_trace_topk_samples, config.num_samples))
+-        idx_uni = (
+-            torch.linspace(
+-                0,
+-                config.num_samples - 1,
+-                steps=n_uni,
+-                dtype=torch.long,
+-                device=config.device,
+-            )
+-            if n_uni > 0
+-            else torch.tensor([], dtype=torch.long, device=config.device)
++            rewards = torch.minimum(rewards, current)
++        compute_weights = (
++            _compute_weights_compiled
++            if config.use_torch_compile
++            else _compute_weights_impl
+         )
+-        idx_top = (
+-            torch.topk(rews, k=n_topk, largest=True).indices
+-            if n_topk > 0
+-            else torch.tensor([], dtype=torch.long, device=config.device)
++        weights, invalid = compute_weights(
++            rewards, config.num_samples, config.temperature
+         )
+-        sel_idx = torch.cat([idx_uni, idx_top], dim=0).long()
+-
+-        # compute info
+-        info = {}
+-        for k, v in rollout_info.items():
+-            if k not in ["trace", "trace_sample"]:
+-                if isinstance(v, torch.Tensor):
+-                    v = v.cpu().numpy()
+-                if v.ndim == 1:
+-                    k_max = k + "_max"
+-                    k_min = k + "_min"
+-                    k_median = k + "_median"
+-                    k_mean = k + "_mean"
+-                    info[k_max] = v.max()
+-                    info[k_min] = v.min()
+-                    info[k_median] = np.median(v)
+-                    info[k_mean] = v.mean()
+-        # log reward
+-        rews_np = rews.cpu().numpy()
+-        improvement = rews_np.max() - rews_np[0]
+-        info["improvement"] = improvement
+-        info["rew_max"] = rews_np.max()
+-        info["rew_min"] = rews_np.min()
+-        info["rew_median"] = np.median(rews_np)
+-        info["rew_mean"] = rews_np.mean()
+-
+-        # Downsample and store trace site positions for selected sample trajectories
+-        if "trace" in rollout_info:
+-            info["trace_sample"] = (
+-                rollout_info["trace"][sel_idx].cpu().numpy()
+-            )  # (M, H, n_trace, 3)
+-            info["trace_cost"] = -rews[sel_idx].cpu().numpy()
+-
+-        return ctrls_mean, terminate, info
++        if proposal_augmenter is not None:
++            proposal_augmenter.observe(weights, samples, ctrls)
++        if invalid.any():
++            loguru.logger.warning("Nonfinite proposal rewards: {}", int(invalid.sum()))
++        updated = (weights[:, None, None] * samples).sum(dim=0)
++        return updated, terminate, {"proposal_center_max_abs_error": center_error}
+ 
+     return optimize_once
+ 
+ 
+-def make_optimize_fn(
+-    optimize_once,
+-):
+-    def optimize(
+-        config: Config,
+-        env,
+-        ctrls: torch.Tensor,
+-        ref_slice: tuple[torch.Tensor, ...],
+-    ):
+-        """Full optimization loop at certain time step. Mainly involves simulation parameter annealing and sampling parameter annealing"""
++def make_optimize_fn(optimize_once, center_evaluator):
++    def optimize(config, env, ctrls, ref_slice):
++        centers = [ctrls.clone()]
++        params = [config.env_params_list[0]]
+         infos = []
+-
+-        # schedule sampling parameters
+-        sample_params_list = []
+-        for i in range(config.max_num_iterations):
+-            sample_params = {
+-                "global_noise_scale": config.beta_traj**i,
+-            }
+-            sample_params_list.append(sample_params)
+-
+-        # optimize
+-        improvement_history = []
+         for i in range(config.max_num_iterations):
+-            ctrls, terminate, info = optimize_once(
++            ctrls, _, info = optimize_once(
+                 config,
+                 env,
+                 ctrls,
+                 ref_slice,
+                 config.env_params_list[i],
+-                sample_params_list[i],
++                {"global_noise_scale": config.beta_traj**i},
+             )
+             infos.append(info)
+-            improvement_history.append(info["improvement"])
+-
+-            # early stopping: check if last n steps all have improvement below threshold
+-            terminate_all = terminate.all()
+-            terminate_early_stopping = terminate_all and config.terminate_resample
+-            if (
+-                len(improvement_history) >= config.improvement_check_steps
+-                and not terminate_early_stopping
+-            ):
+-                recent_improvements = improvement_history[
+-                    -config.improvement_check_steps :
+-                ]
+-                if all(
+-                    imp < config.improvement_threshold for imp in recent_improvements
+-                ):
+-                    break
+-
+-        # TODO: think about a better logic
+-        # append zeros to infos to make sure the length is the same as max_num_iterations
+-        fake_info = {}
+-        for k, v in infos[0].items():
+-            fake_info[k] = np.zeros_like(v)
+-        for _ in range(config.max_num_iterations - len(infos)):
+-            infos.append(fake_info)
+-        info_aggregated = {}
+-        for k in infos[0].keys():
+-            info_aggregated[k] = np.stack([info[k] for info in infos], axis=0)
+-        info_aggregated["opt_steps"] = np.array([i + 1])
+-        return ctrls, info_aggregated
++            centers.append(ctrls.clone())
++            params.append(config.env_params_list[i])
++        # Keep the recorded post-selection center rollouts in the same order.
++        costs = [
++            center_evaluator(config, env, center, ref_slice, env_params)
++            for center, env_params in zip(centers, params, strict=True)
++        ]
++        return ctrls, {
++            "opt_steps": np.asarray([config.max_num_iterations]),
++            "cost_center": np.asarray(costs),
++            "proposal_center_max_abs_error": np.asarray(
++                [x["proposal_center_max_abs_error"] for x in infos]
++            ),
++        }
+ 
+     return optimize

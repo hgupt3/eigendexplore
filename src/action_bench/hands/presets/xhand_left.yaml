@@ -1,0 +1,56 @@
+schema_version: 2
+id: xhand_left
+family: xhand
+side: left
+joint_signs:
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+- 1
+joint_names:
+- left_hand_thumb_bend_joint
+- left_hand_thumb_rota_joint1
+- left_hand_thumb_rota_joint2
+- left_hand_index_bend_joint
+- left_hand_index_joint1
+- left_hand_index_joint2
+- left_hand_mid_joint1
+- left_hand_mid_joint2
+- left_hand_ring_joint1
+- left_hand_ring_joint2
+- left_hand_pinky_joint1
+- left_hand_pinky_joint2
+joint_lower:
+- 0.0
+- -1.05
+- -0.17
+- -0.175
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+- 0.0
+joint_upper:
+- 1.83
+- 1.57
+- 1.83
+- 0.175
+- 1.92
+- 1.92
+- 1.92
+- 1.92
+- 1.92
+- 1.92
+- 1.92
+- 1.92

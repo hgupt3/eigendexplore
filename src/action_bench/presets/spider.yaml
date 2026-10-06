@@ -1,0 +1,33 @@
+schema_version: 2
+benchmark: spider
+hand: sharpa
+hands:
+- sharpa
+- allegro
+- xhand
+- inspire
+- schunk
+- wuji
+methods:
+- iid
+- eigendexplore
+basis: human
+retained_variance: 0.9
+iid_scale: 1.0
+eigen_scale: 1.0
+eigenvalue_power: 1.0
+particles: 1024
+updates_per_commit: 16
+executed_steps: 400
+integration_profile: implicitfast_no_midpoint_v1
+seeds:
+- 973500
+- 973501
+- 973502
+- 973503
+- 973504
+- 973505
+- 973506
+- 973507
+- 973508
+- 973509

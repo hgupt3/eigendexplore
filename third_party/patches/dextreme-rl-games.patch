@@ -1,0 +1,131 @@
+diff --git a/rl_games/algos_torch/a2c_continuous.py b/rl_games/algos_torch/a2c_continuous.py
+index dab36bfba89514fa7037b30137399f3995e863b0..4bbd6f80bce8a45665e393437d90faac3b9e2f70 100644
+--- a/rl_games/algos_torch/a2c_continuous.py
++++ b/rl_games/algos_torch/a2c_continuous.py
+@@ -176,6 +176,9 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+             entropy = res_dict['entropy']
+             mu = res_dict['mus']
+             sigma = res_dict['sigmas']
++            eigen_sigma = res_dict.get('eigen_sigmas')
++            if eigen_sigma is not None:
++                eigen_sigma = eigen_sigma.detach()
+ 
+             loss, a_loss, c_loss, entropy, b_loss, sum_mask = self.calc_losses(
+                 self.actor_loss_func,
+@@ -213,7 +216,13 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+ 
+         with torch.no_grad():
+             reduce_kl = rnn_masks is None
+-            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
++            if eigen_sigma is not None:
++                kl_dist = self.model.a2c_network.eigendexplore.policy_kl(
++                    mu.detach(), sigma.detach(), eigen_sigma,
++                    old_mu_batch, old_sigma_batch, input_dict['eigen_sigma'],
++                    reduce_kl)
++            else:
++                kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
+             if rnn_masks is not None:
+                 kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
+ 
+@@ -228,7 +237,7 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+ 
+         self.train_result = (a_loss, c_loss, entropy,
+             kl_dist, self.last_lr, lr_mul,
+-            mu.detach(), sigma.detach(), b_loss)
++            mu.detach(), sigma.detach(), eigen_sigma, b_loss)
+ 
+     def train_actor_critic(self, input_dict):
+         self.set_train()
+diff --git a/rl_games/common/a2c_common.py b/rl_games/common/a2c_common.py
+index c37ba29b53e02bb7ac3d0b4743ebd6ae07fc4da8..d5cca7d54383fd9bbb4bb9a6cee10aa47ff0e799 100644
+--- a/rl_games/common/a2c_common.py
++++ b/rl_games/common/a2c_common.py
+@@ -646,7 +646,15 @@ class A2CBase(BaseAlgorithm):
+         state['optimizer'] = self.optimizer.state_dict()
+ 
+         if self.has_central_value:
+-            state['assymetric_vf_nets'] = self.central_value_net.state_dict()
++            # Checkpoints use the uncompiled critic namespace. The runner
++            # restores before torch.compile wraps the critic's model.
++            central_state = self.central_value_net.state_dict()
++            compiled_prefix = 'model._orig_mod.'
++            state['assymetric_vf_nets'] = {
++                ('model.' + key[len(compiled_prefix):]
++                 if key.startswith(compiled_prefix) else key): value
++                for key, value in central_state.items()
++            }
+             state['assymetric_vf_optimizer'] = self.central_value_net.optimizer.state_dict()
+ 
+         # This is actually the best reward ever achieved. last_mean_rewards is perhaps not the best variable name
+@@ -672,6 +680,7 @@ class A2CBase(BaseAlgorithm):
+                 self.central_value_net.optimizer.load_state_dict(weights['assymetric_vf_optimizer'])
+ 
+         self.optimizer.load_state_dict(weights['optimizer'])
++        self.last_lr = self.optimizer.param_groups[0]['lr']
+ 
+         self.last_mean_rewards = weights.get('last_mean_rewards', -1000000000)
+ 
+@@ -1224,6 +1233,12 @@ class ContinuousA2CBase(A2CBase):
+     def init_tensors(self):
+         A2CBase.init_tensors(self)
+         self.update_list = ['actions', 'neglogpacs', 'values', 'mus', 'sigmas']
++        exploration = getattr(self.model.a2c_network, 'eigendexplore', None)
++        if exploration is not None:
++            sigmas = self.experience_buffer.tensor_dict['sigmas']
++            self.experience_buffer.tensor_dict['eigen_sigmas'] = sigmas.new_zeros(
++                (*sigmas.shape[:-1], exploration.basis.shape[0]))
++            self.update_list.append('eigen_sigmas')
+         self.tensor_list = self.update_list + ['obses', 'states', 'dones']
+ 
+     def train_epoch(self):
+@@ -1257,7 +1272,7 @@ class ContinuousA2CBase(A2CBase):
+         for mini_ep in range(0, self.mini_epochs_num):
+             ep_kls = []
+             for i in range(len(self.dataset)):
+-                a_loss, c_loss, entropy, kl, last_lr, lr_mul, cmu, csigma, b_loss = self.train_actor_critic(self.dataset[i])
++                a_loss, c_loss, entropy, kl, last_lr, lr_mul, cmu, csigma, ceigen_sigma, b_loss = self.train_actor_critic(self.dataset[i])
+                 a_losses.append(a_loss)
+                 c_losses.append(c_loss)
+                 ep_kls.append(kl)
+@@ -1265,7 +1280,7 @@ class ContinuousA2CBase(A2CBase):
+                 if self.bounds_loss_coef is not None:
+                     b_losses.append(b_loss)
+ 
+-                self.dataset.update_mu_sigma(cmu, csigma)
++                self.dataset.update_mu_sigma(cmu, csigma, ceigen_sigma)
+                 if self.schedule_type == 'legacy':
+                     av_kls = kl
+                     if self.multi_gpu:
+@@ -1343,6 +1358,8 @@ class ContinuousA2CBase(A2CBase):
+         dataset_dict['rnn_masks'] = rnn_masks
+         dataset_dict['mu'] = mus
+         dataset_dict['sigma'] = sigmas
++        if 'eigen_sigmas' in batch_dict:
++            dataset_dict['eigen_sigma'] = batch_dict['eigen_sigmas']
+ 
+         self.dataset.update_values_dict(dataset_dict)
+ 
+diff --git a/rl_games/common/datasets.py b/rl_games/common/datasets.py
+index 458fc466e3c5bfd502d367eee29b90ce9d042309..c0044f4e20a3ad181837a8e37fccfc0ae7e05057 100644
+--- a/rl_games/common/datasets.py
++++ b/rl_games/common/datasets.py
+@@ -30,7 +30,7 @@ class PPODataset(Dataset):
+         """Update the internal values dictionary."""
+         self.values_dict = values_dict
+ 
+-    def update_mu_sigma(self, mu, sigma):
++    def update_mu_sigma(self, mu, sigma, eigen_sigma=None):
+         """Update the mu and sigma values in the dataset."""
+         start, end = self.last_range
+         # Ensure the permutation does not break the logic for updating.
+@@ -41,6 +41,10 @@ class PPODataset(Dataset):
+         # else:
+         self.values_dict['mu'][start:end] = mu
+         self.values_dict['sigma'][start:end] = sigma
++        if 'eigen_sigma' in self.values_dict:
++            if eigen_sigma is None:
++                raise ValueError('EigenDExplore KL requires reference eigen scales')
++            self.values_dict['eigen_sigma'][start:end] = eigen_sigma
+ 
+     def apply_permutation(self):
+         """Permute the dataset indices if the permutation flag is enabled."""

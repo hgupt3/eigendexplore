@@ -1,0 +1,201 @@
+schema_version: 4
+id: sharpa_egosuite_6hz_v1_pca
+kind: pca
+producer_revision: bf217fec2191-worktree-c52f3dabdcd0
+construction: mirrored_pair
+canonical_hand_layout: sharpa_right
+deployment_layouts:
+- hand_layout: sharpa_left
+  joint_names:
+  - left_thumb_CMC_FE
+  - left_thumb_CMC_AA
+  - left_thumb_MCP_FE
+  - left_thumb_MCP_AA
+  - left_thumb_IP
+  - left_index_MCP_FE
+  - left_index_MCP_AA
+  - left_index_PIP
+  - left_index_DIP
+  - left_middle_MCP_FE
+  - left_middle_MCP_AA
+  - left_middle_PIP
+  - left_middle_DIP
+  - left_ring_MCP_FE
+  - left_ring_MCP_AA
+  - left_ring_PIP
+  - left_ring_DIP
+  - left_pinky_CMC
+  - left_pinky_MCP_FE
+  - left_pinky_MCP_AA
+  - left_pinky_PIP
+  - left_pinky_DIP
+  joint_signs:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+- hand_layout: sharpa_right
+  joint_names:
+  - right_thumb_CMC_FE
+  - right_thumb_CMC_AA
+  - right_thumb_MCP_FE
+  - right_thumb_MCP_AA
+  - right_thumb_IP
+  - right_index_MCP_FE
+  - right_index_MCP_AA
+  - right_index_PIP
+  - right_index_DIP
+  - right_middle_MCP_FE
+  - right_middle_MCP_AA
+  - right_middle_PIP
+  - right_middle_DIP
+  - right_ring_MCP_FE
+  - right_ring_MCP_AA
+  - right_ring_PIP
+  - right_ring_DIP
+  - right_pinky_CMC
+  - right_pinky_MCP_FE
+  - right_pinky_MCP_AA
+  - right_pinky_PIP
+  - right_pinky_DIP
+  joint_signs:
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+  - 1
+dataset: egosuite
+source_corpora:
+- sharpa_arctic_canonical_right_6hz_v18_final_v1
+- sharpa_grab_canonical_right_6hz_v18_final_v1
+- sharpa_egosuite_complete_canonical_right_6hz_v18_final_v1
+source_validation_protocols:
+- full_chain_fixed_root_report_only_v1
+- full_chain_fixed_root_report_only_v1
+- sharded_full_chain_fixed_root_report_only_v1
+joint_names:
+- right_thumb_CMC_FE
+- right_thumb_CMC_AA
+- right_thumb_MCP_FE
+- right_thumb_MCP_AA
+- right_thumb_IP
+- right_index_MCP_FE
+- right_index_MCP_AA
+- right_index_PIP
+- right_index_DIP
+- right_middle_MCP_FE
+- right_middle_MCP_AA
+- right_middle_PIP
+- right_middle_DIP
+- right_ring_MCP_FE
+- right_ring_MCP_AA
+- right_ring_PIP
+- right_ring_DIP
+- right_pinky_CMC
+- right_pinky_MCP_FE
+- right_pinky_MCP_AA
+- right_pinky_PIP
+- right_pinky_DIP
+joint_lower:
+- -0.1745
+- -0.3491
+- -0.5236
+- -0.3491
+- 0.0
+- -0.17453293
+- -0.3491
+- 0.0
+- 0.0
+- -0.17453293
+- -0.3491
+- 0.0
+- 0.0
+- -0.17453293
+- -0.3491
+- 0.0
+- 0.0
+- 0.0
+- -0.17453293
+- -0.3491
+- 0.0
+- 0.0
+joint_upper:
+- 1.9199
+- 0.3491
+- 1.3963
+- 0.3491
+- 1.7453
+- 1.5708
+- 0.3491
+- 1.7453
+- 1.3963
+- 1.5708
+- 0.3491
+- 1.7453
+- 1.3963
+- 1.5708
+- 0.3491
+- 1.7453
+- 1.3963
+- 0.2618
+- 1.5708
+- 0.3491
+- 1.7453
+- 1.3963
+component_count: 22
+fit:
+  split: train
+  split_protocol: egosuite_selected_weight_mixture_v1
+  objective: posture_covariance
+  measure: frame
+  weighting: explicit_dataset_then_trajectory
+  motion_horizon_ms: 100
+  dataset_weights:
+  - 0.6
+  - 0.2
+  - 0.2
+  lower_quantile: 0.01
+  upper_quantile: 0.99
+fit_summary:
+  source_trajectory_count: 9949
+  source_frame_count: 2782828
+  source_sequence_count: 3596
+  fit_trajectory_count: 7934
+  fit_frame_count: 2247940
+  fit_source_sequence_count: 3169
+payload: pca.safetensors

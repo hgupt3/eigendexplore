@@ -1,0 +1,70 @@
+# Derived with action_bench.hands.urdf_import from the pinned vendor left URDF
+# (wuji-description 1407bee); right-recipe axis parity supplies the four -1 signs.
+schema_version: 2
+id: wuji_left
+family: wuji
+side: left
+joint_signs: [1, 1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, 1]
+joint_names:
+- left_finger1_joint1
+- left_finger1_joint2
+- left_finger1_joint3
+- left_finger1_joint4
+- left_finger2_joint1
+- left_finger2_joint2
+- left_finger2_joint3
+- left_finger2_joint4
+- left_finger3_joint1
+- left_finger3_joint2
+- left_finger3_joint3
+- left_finger3_joint4
+- left_finger4_joint1
+- left_finger4_joint2
+- left_finger4_joint3
+- left_finger4_joint4
+- left_finger5_joint1
+- left_finger5_joint2
+- left_finger5_joint3
+- left_finger5_joint4
+joint_lower:
+- 0.0475
+- -0.1387
+- -0.4642
+- -0.4699
+- -0.1585
+- -0.37
+- -0.4777
+- -0.4683
+- -0.1644
+- -0.37
+- -0.4739
+- -0.4684
+- -0.1554
+- -0.37
+- -0.4765
+- -0.4777
+- -0.1626
+- -0.37
+- -0.4768
+- -0.4683
+joint_upper:
+- 1.6033
+- 0.9324
+- 1.5623
+- 1.5568
+- 1.5604
+- 0.37
+- 1.5485
+- 1.5753
+- 1.5516
+- 0.37
+- 1.5512
+- 1.5745
+- 1.5585
+- 0.37
+- 1.5487
+- 1.5634
+- 1.5585
+- 0.37
+- 1.549
+- 1.5735

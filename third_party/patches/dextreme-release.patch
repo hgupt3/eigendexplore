@@ -1,0 +1,642 @@
+diff --git a/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml b/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
+index 8836fef..280f806 100644
+--- a/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
++++ b/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
+@@ -6,6 +6,8 @@ physics_engine: ${..physics_engine}
+ # if given, will override the device setting in gym.
+ env: 
+   numEnvs: ${resolve_default:16384,${...num_envs}}
++  numActions: 16
++  numLatentObs: 0
+   envSpacing: 0.75
+   episodeLength: 320 # Not used, but would be 8 sec if resetTime is not set
+   resetTime: 8 # Max time till reset, in seconds, if a goal wasn't achieved. Will overwrite the episodeLength if is > 0.
+diff --git a/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml b/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml
+index 01cf084..1f46e4a 100644
+--- a/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml
++++ b/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml
+@@ -6,6 +6,8 @@ physics_engine: ${..physics_engine}
+ # if given, will override the device setting in gym.
+ env: 
+   numEnvs: ${resolve_default:16384,${...num_envs}}
++  numActions: 16
++  numLatentObs: 0
+   envSpacing: 0.75
+   episodeLength: 320 # Not used, but would be 8 sec if resetTime is not set
+   resetTime: 8 # Max time till reset, in seconds, if a goal wasn't achieved. Will overwrite the episodeLength if is > 0.
+diff --git a/isaacgymenvs/release_bundle.py b/isaacgymenvs/release_bundle.py
+new file mode 100644
+index 0000000..78b1ad1
+--- /dev/null
++++ b/isaacgymenvs/release_bundle.py
+@@ -0,0 +1,94 @@
++"""Strict Python 3.8 loader for Action-Bench release target bundles."""
++import json
++from pathlib import Path
++
++import torch
++from rl_games.common.algo_observer import AlgoObserver
++
++
++class TargetBundle:
++    def __init__(self, module, manifest):
++        self.module, self.manifest = module, manifest
++        self.action_dim = manifest['action_dim']
++        self.latent_obs_dim = manifest['latent_obs_dim']
++        self.commanded_target_obs_dim = manifest['commanded_target_obs_dim']
++
++    def decode(self, action, previous):
++        target = self.module.decode(action, previous)
++        self.module.metrics_update(action, previous, target)
++        return target
++
++    def encode_obs(self, measured, previous):
++        latent = self.module.encode_obs(measured)
++        self.module.metrics_update_measured(measured)
++        if self.commanded_target_obs_dim:
++            latent = torch.cat((latent, self.module.commanded_obs(previous)), 1)
++        return latent
++
++    def reset_state(self, indices):
++        self.module.metrics_notify_reset(indices)
++
++    def metrics_flush(self):
++        return self.module.metrics_flush()
++
++
++def load_bundle(env, directory):
++    root = Path(directory)
++    if {p.name for p in root.iterdir()} != {'bundle.pt', 'manifest.json'}:
++        raise ValueError('bundle files differ from release contract')
++    manifest = json.loads((root / 'manifest.json').read_text())
++    keys = {'schema_version', 'format', 'study', 'action_type', 'action_dim',
++            'measured_latent_dim', 'commanded_target_obs_dim', 'latent_obs_dim',
++            'semantics', 'host_joint_names', 'artifact_id', 'num_envs'}
++    if set(manifest) != keys or manifest['schema_version'] != 5 or manifest['format'] != 'action_bench.dextreme.torchscript.v5':
++        raise ValueError('unsupported target bundle schema')
++    if (manifest['action_dim'] != env.num_actions or manifest['latent_obs_dim'] != env.num_latent_obs
++            or manifest['num_envs'] != env.num_envs):
++        raise ValueError('bundle dimensions differ from live environment')
++    actual = env.gym.get_actor_dof_names(env.envs[0], env.allegro_hands[0])
++    if list(actual) != manifest['host_joint_names']:
++        raise ValueError('live joint order differs from target bundle')
++    if env.use_relative_control or getattr(env, 'use_capped_dof_control', False):
++        raise ValueError('target bundles require absolute uncapped host control')
++    for name in ('hand_action_transform', 'latent_obs_fn', 'hand_state_reset_fn'):
++        if getattr(env, name, None) is not None:
++            raise ValueError('refusing to overwrite an existing host hook')
++    module = torch.jit.load(str(root / 'bundle.pt'), map_location=env.dof_pos.device).eval()
++    if module.action_dim != manifest['action_dim'] or module.metrics_num_envs != env.num_envs:
++        raise ValueError('module dimensions differ from manifest')
++    if module.measured_latent_dim != manifest['measured_latent_dim'] or module.commanded_obs_dim != manifest['commanded_target_obs_dim']:
++        raise ValueError('module observation widths differ from manifest')
++    for name, tensor in list(module.named_parameters()) + list(module.named_buffers()):
++        if tensor.device != env.dof_pos.device:
++            raise ValueError('bundle tensor placement differs from host')
++        if tensor.is_floating_point() and not name.startswith('metrics.') and tensor.dtype != env.dof_pos.dtype:
++            raise ValueError('bundle dtype differs from host')
++    delta = manifest['action_type'] in ('joint_delta', 'eigen_delta_joint_delta')
++    if manifest['semantics'] != ('delta' if delta else 'absolute'):
++        raise ValueError('manifest action semantics differ from method')
++    if manifest['latent_obs_dim'] != module.measured_latent_dim + module.commanded_obs_dim:
++        raise ValueError('total observation width differs from module')
++    if manifest['study']['benchmark'] != 'dextreme' or manifest['study']['hand'] != 'allegro':
++        raise ValueError('study does not match the DeXtreme hand')
++    loaded = TargetBundle(module, manifest)
++    env.hand_action_transform = loaded.decode
++    env.latent_obs_fn = loaded.encode_obs if loaded.latent_obs_dim else None
++    env.hand_state_reset_fn = loaded.reset_state
++    env.hand_actions_are_deltas = manifest['semantics'] == 'delta'
++    env.actionbench_bundle = loaded
++    return loaded
++
++
++class MetricsObserver(AlgoObserver):
++    """Write scalar diagnostics; full tensor statistics remain on the bundle."""
++    def after_init(self, algo):
++        self.bundle = algo.vec_env.env.actionbench_bundle
++        self.writer = algo.writer
++
++    def after_print_stats(self, frame, epoch_num, total_time):
++        metrics = self.bundle.metrics_flush()
++        entries = [(key, value) for key, value in metrics.items() if value.numel() == 1]
++        if entries:
++            values = torch.stack([value.reshape(()) for _, value in entries]).cpu().tolist()
++            for (key, _), value in zip(entries, values):
++                self.writer.add_scalar(key, value, frame)
+diff --git a/isaacgymenvs/release_recording.py b/isaacgymenvs/release_recording.py
+new file mode 100644
+index 0000000..035c917
+--- /dev/null
++++ b/isaacgymenvs/release_recording.py
+@@ -0,0 +1,98 @@
++"""Optional state recording through the shared Python 3.8 capture modules."""
++import importlib.util
++import os
++from pathlib import Path
++import sys
++
++import torch
++from rl_games.common.algo_observer import AlgoObserver
++
++
++def recording_modules():
++    root = Path(os.environ['ACTION_BENCH_RECORDING_MODULES'])
++    name = '_action_bench_recording'
++    if name not in sys.modules:
++        spec = importlib.util.spec_from_file_location(
++            name, root / '__init__.py', submodule_search_locations=[str(root)])
++        module = importlib.util.module_from_spec(spec)
++        sys.modules[name] = module
++        spec.loader.exec_module(module)
++    from _action_bench_recording.capture import TrainingStateCapture
++    from _action_bench_recording.observer import StateCaptureObserver
++    return TrainingStateCapture, StateCaptureObserver
++
++
++def capture_rows(task, robot_scale):
++    def pose(value):
++        return torch.cat((value[:3], value[6:7], value[3:6]))
++    return {
++        'joint_pos_allegro': task.dof_pos[0],
++        'joint_target_allegro': task.cur_targets[0],
++        'object_pose': pose(task.object_pose[0]),
++        'goal_pose': pose(task.goal_pose[0]),
++        'reset': task.reset_buf[0].bool(),
++        'action': task.actions[0],
++        'object_scale': task.cube_random_params[0, 0].expand(3),
++        'robot_scale_allegro': robot_scale,
++    }
++
++
++def build_capture(task, output):
++    Capture, _ = recording_modules()
++    control_dt = float(task.dt) * int(task.control_freq_inv)
++    specs = {'joint_pos_allegro': (task.num_hand_dofs,),
++             'joint_target_allegro': (task.num_hand_dofs,), 'object_pose': (7,),
++             'goal_pose': (7,), 'reset': (), 'action': (task.num_actions,),
++             'object_scale': (3,), 'robot_scale_allegro': (3,)}
++    base = task.hand_start_states[0, :7].detach().cpu().tolist()
++    assets = task.cfg['env']['asset']
++    def asset(path):
++        return {'host_repo': 'isaacgymenvs', 'relative_path': 'assets/' + path}
++    template = {
++        'schema_version': 1, 'format': 'action_bench.capture.v1',
++        'benchmark': 'dextreme', 'experiment_id': Path(output).parent.name,
++        'control_dt': control_dt, 'wandb': {'project': '', 'run_id': ''},
++        'robots': [{'name': 'allegro', 'asset': asset(assets['assetFileName']),
++                    'joint_names': list(task.gym.get_actor_dof_names(task.envs[0], task.allegro_hands[0])),
++                    'base_pose': base[:3] + [base[6]] + base[3:6]}],
++        'objects': [{'name': 'cube', 'asset': asset(assets['assetFileNameBlock']),
++                     'scale': None, 'articulated': False}],
++        'channels': {name: {'shape': list(shape), 'dtype': 'bool' if name == 'reset' else 'float32'}
++                     for name, shape in specs.items()},
++        'extras_meta': {'quaternion_convention': 'wxyz'},
++    }
++    return Capture(specs, {'reset': torch.bool}, round(30 / control_dt),
++                   round(15 / control_dt), template, output, task.dof_pos.device)
++
++
++class RecordingObserver(AlgoObserver):
++    def __init__(self):
++        self.capture = None
++        self.task = None
++
++    def after_init(self, algo):
++        _, Observer = recording_modules()
++        self.task = algo.vec_env.env
++        self.capture = build_capture(self.task, os.environ['ACTION_BENCH_RECORD_DIR'])
++        schedule = [{'every_epochs': 60, 'through_epoch': 380},
++                    {'every_epochs': 130, 'through_epoch': None}]
++        self.observer = Observer(self.capture, schedule, AlgoObserver())
++        scale = self.task.gym.get_actor_scale(self.task.envs[0], self.task.allegro_hands[0])
++        self.robot_scale = self.task.dof_pos.new_full((3,), scale)
++        self.observer.after_init(algo)
++        self.original_step = self.task.post_physics_step
++        def step():
++            result = self.original_step()
++            if self.capture.active:
++                self.capture.append(capture_rows(self.task, self.robot_scale))
++            return result
++        self.task.post_physics_step = step
++
++    def after_print_stats(self, frame, epoch_num, total_time):
++        self.observer.after_print_stats(frame, epoch_num, total_time)
++
++    def close(self):
++        if self.capture is not None:
++            if hasattr(self, 'original_step'):
++                self.task.post_physics_step = self.original_step
++            self.capture.close(timeout=60)
+diff --git a/isaacgymenvs/tasks/dextreme/adr_vec_task.py b/isaacgymenvs/tasks/dextreme/adr_vec_task.py
+index 1e76317..2073710 100644
+--- a/isaacgymenvs/tasks/dextreme/adr_vec_task.py
++++ b/isaacgymenvs/tasks/dextreme/adr_vec_task.py
+@@ -765,6 +765,7 @@ class ADRVecTask(VecTaskDextreme):
+         rand_env_mask[rand_envs] = True
+ 
+         total_nats = 0.0 # measuring entropy
++        enabled_dims = 0
+ 
+         if self.update_adr_ranges:
+ 
+@@ -875,6 +876,7 @@ class ADRVecTask(VecTaskDextreme):
+ 
+                     nats = np.log(upper_lower_delta)
+                     total_nats += nats
++                    enabled_dims += 1
+                     # print(f'nats {nats} delta {upper_lower_delta} range lower {range_lower} range upper {range_upper}')
+ 
+                 self.adr_params[adr_param_name]["next_limits"] = [next_limit_lower, next_limit_upper]
+@@ -903,7 +905,7 @@ class ADRVecTask(VecTaskDextreme):
+                 else:
+                     self.adr_rollout_perf_last = self.adr_rollout_perf_last * self.adr_rollout_perf_alpha + mean_perf * (1-self.adr_rollout_perf_alpha)
+                 self.extras[f'adr/objective_perf/rollouts'] = self.adr_rollout_perf_last
+-                self.extras[f'adr/npd'] = total_nats / len(self.adr_params)
++                self.extras[f'adr/npd'] = total_nats / max(enabled_dims, 1)
+             
+             if not already_recycled: 
+                 self.recycle_envs(rand_envs)
+diff --git a/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py b/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
+index 89d0a46..8c13d47 100644
+--- a/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
++++ b/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
+@@ -52,8 +52,60 @@ from isaacgymenvs.utils.torch_jit_utils import quaternion_to_matrix, matrix_to_q
+ from isaacgymenvs.utils.rna_util import RandomNetworkAdversary
+ 
+ 
++def compute_hand_joint_targets(actions, prev_targets, lower_limits, upper_limits, hand_action_transform=None):
++    """Convert policy actions to absolute Allegro joint targets."""
++    if hand_action_transform is None:
++        assert actions.shape[-1] == prev_targets.shape[-1], \
++            "Default hand action scaling requires env.numActions to equal the 16 Allegro hand DoFs"
++        return scale(actions, lower_limits, upper_limits)
++
++    targets = hand_action_transform(actions, prev_targets)
++    assert targets.shape == prev_targets.shape, \
++        "hand_action_transform must return one absolute target per Allegro hand DoF"
++    return targets
++
++def add_latent_state_observation(obs_dims, num_latent_obs):
++    """Add the optional adapter-computed observation to a dict observation layout."""
++    if num_latent_obs < 0:
++        raise ValueError("env.numLatentObs must be non-negative")
++    if num_latent_obs > 0:
++        obs_dims["latent_state"] = num_latent_obs
++    return obs_dims
++
++def compute_latent_observation(
++    hand_dof_pos, hand_prev_targets, num_latent_obs, latent_obs_fn=None
++):
++    """Compute one latent observation from measured hand positions and the
++    previously commanded hand targets, when enabled."""
++    if num_latent_obs == 0:
++        return None
++    if latent_obs_fn is None:
++        raise RuntimeError(
++            "env.numLatentObs > 0 requires self.latent_obs_fn to be set before stepping"
++        )
++    if hand_dof_pos.ndim != 2 or hand_dof_pos.shape[1] != 16:
++        raise ValueError("latent_obs_fn input must have shape (num_envs, 16)")
++    if hand_prev_targets.shape != hand_dof_pos.shape:
++        raise ValueError(
++            "latent_obs_fn previous targets must match measured posture shape"
++        )
++
++    latent_state = latent_obs_fn(hand_dof_pos, hand_prev_targets)
++    if not isinstance(latent_state, Tensor):
++        raise TypeError("latent_obs_fn must return a torch.Tensor")
++    expected_shape = (hand_dof_pos.shape[0], num_latent_obs)
++    if latent_state.shape != expected_shape:
++        raise ValueError(
++            f"latent_obs_fn must return shape {expected_shape}, got {tuple(latent_state.shape)}"
++        )
++    return latent_state
++
++
+ class AllegroHandDextreme(ADRVecTask):
+ 
++    def apply_action_noise(self, targets):
++        return targets
++
+     dict_obs_cls = True
+ 
+     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+@@ -76,6 +128,10 @@ class AllegroHandDextreme(ADRVecTask):
+         '''
+ 
+         self.cfg = cfg
++        self.hand_action_transform = None
++        self.latent_obs_fn = None
++        self.hand_state_reset_fn = None
++        self.hand_actions_are_deltas = False
+ 
+         # Read the task config file and store all the relevant variables in the class
+         self._read_cfg()
+@@ -83,8 +139,19 @@ class AllegroHandDextreme(ADRVecTask):
+         self.fingertips = [s+"_link_3" for s in ["index", "middle", "ring", "thumb"]]
+         self.num_fingertips = len(self.fingertips)
+         num_dofs = 16
++        self.num_actions = int(self.cfg["env"].get("numActions", 16))
++        self.cfg["env"]["numActions"] = self.num_actions
++        self.num_latent_obs = int(self.cfg["env"].get("numLatentObs", 0))
++        self.cfg["env"]["numLatentObs"] = self.num_latent_obs
++
++        # RNA is native-16: for transformed action spaces the adversary mixes
++        # into the decoded joint targets in canonical dof coordinates instead
++        # of the raw policy actions (identical for the identity transform).
+         
+-        self.num_obs_dict = self.get_num_obs_dict(num_dofs)
++        self.num_obs_dict = add_latent_state_observation(
++            self.get_num_obs_dict(num_dofs, self.num_actions),
++            self.num_latent_obs,
++        )
+ 
+         self.cfg["env"]["obsDims"] = {} 
+ 
+@@ -99,8 +166,6 @@ class AllegroHandDextreme(ADRVecTask):
+         self.fingertip_obs = True
+         self.asymmetric_obs = self.cfg["env"]["asymmetric_observations"]
+ 
+-        self.cfg["env"]["numActions"] = 16
+-
+         self.sim_device = sim_device
+ 
+         rl_device = self.cfg.get("rl_device", "cuda:0")
+@@ -131,6 +196,11 @@ class AllegroHandDextreme(ADRVecTask):
+                 shutil.rmtree(self.eval_summary_dir)
+             self.eval_summaries = SummaryWriter(self.eval_summary_dir, flush_secs=3)
+ 
++        directory = os.environ.get("ACTION_BENCH_BUNDLE")
++        if directory:
++            from isaacgymenvs.release_bundle import load_bundle
++            load_bundle(self, directory)
++
+     def get_env_state(self):
+ 
+         env_dict=dict(act_moving_average=self.act_moving_average)
+@@ -165,7 +235,7 @@ class AllegroHandDextreme(ADRVecTask):
+     def save_step(self):
+         self.capture.append_experience(self.get_save_tensors())
+ 
+-    def get_num_obs_dict(self, num_dofs):
++    def get_num_obs_dict(self, num_dofs, num_actions):
+     
+         # This is what we use for ADR 
+         num_obs = {
+@@ -176,7 +246,7 @@ class AllegroHandDextreme(ADRVecTask):
+ 
+             "object_vels": 6,
+ 
+-            "last_actions": num_dofs,
++            "last_actions": num_actions,
+             "cube_random_params": 3,
+             "hand_random_params": 1,
+             "gravity_vec": 3,
+@@ -187,7 +257,7 @@ class AllegroHandDextreme(ADRVecTask):
+             "rot_dist": 2,
+ 
+             "stochastic_delay_params": 4, # cube obs + action delay prob, action fixed latency, pose refresh rate
+-            "affine_params": 16*2 + 7*2 + 16*2,
++            "affine_params": num_dofs*2 + 7*2 + num_dofs*2,
+ 
+             "object_pose": 7,
+             "goal_pose": 7,
+@@ -691,6 +761,15 @@ class AllegroHandDextreme(ADRVecTask):
+         self.obs_dict["rot_dist"][:, 0] = self.curr_rotation_dist
+         self.obs_dict["rot_dist"][:, 1] = self.best_rotation_dist
+ 
++        latent_state = compute_latent_observation(
++            self.dof_pos,
++            self.prev_targets[:, self.actuated_dof_indices],
++            self.num_latent_obs,
++            self.latent_obs_fn,
++        )
++        if latent_state is not None:
++            self.obs_dict["latent_state"][:] = latent_state
++
+ 
+     def get_random_quat(self, env_ids):
+ 
+@@ -856,6 +935,8 @@ class AllegroHandDextreme(ADRVecTask):
+         self.successes[env_ids] = 0
+         self.best_rotation_dist[env_ids] = -1
+         self.hold_count_buf[env_ids] = 0
++        if self.hand_state_reset_fn is not None:
++            self.hand_state_reset_fn(env_ids)
+ 
+     def get_rna_alpha(self):
+         """Function to get RNA alpha value."""
+@@ -957,13 +1038,21 @@ class AllegroHandDextreme(ADRVecTask):
+         self.actions = actions.clone().to(self.device)
+ 
+         refreshed = self.progress_buf == 0
+-        self.prev_actions_queue[refreshed] = unscale(self.dof_pos[refreshed], self.hand_dof_lower_limits, 
+-                                                     self.hand_dof_upper_limits).view(-1, 1, self.num_actions)
+-        
+-        # Needed for the first step and every refresh 
+-        # you don't want to mix with zeros
+-        self.prev_actions[refreshed] = unscale(self.dof_pos[refreshed], self.hand_dof_lower_limits, 
+-                                               self.hand_dof_upper_limits).view(-1, self.num_actions)
++        # The posture refill is only correct for absolute joint semantics
++        # ("re-command where you are"); for integrator (delta) semantics the
++        # neutral refill is zero ("hold"), since a posture read as a delta is
++        # a full-hand kick.
++        if self.num_actions == self.num_hand_dofs and not self.hand_actions_are_deltas:
++            self.prev_actions_queue[refreshed] = unscale(self.dof_pos[refreshed], self.hand_dof_lower_limits,
++                                                         self.hand_dof_upper_limits).view(-1, 1, self.num_actions)
++
++            # Needed for the first step and every refresh
++            # you don't want to mix with zeros
++            self.prev_actions[refreshed] = unscale(self.dof_pos[refreshed], self.hand_dof_lower_limits,
++                                                   self.hand_dof_upper_limits).view(-1, self.num_actions)
++        else:
++            self.prev_actions_queue[refreshed] = 0.0
++            self.prev_actions[refreshed] = 0.0
+         
+         # update the actions queue
+         self.prev_actions_queue[:, 1:] = self.prev_actions_queue[:, :-1].detach()
+@@ -972,8 +1061,10 @@ class AllegroHandDextreme(ADRVecTask):
+         # apply action delay         
+         actions_delayed = self.apply_action_noise_latency()
+ 
+-        # apply random network adversary 
+-        actions_delayed = self.get_random_network_adversary_action(actions_delayed)
++        # apply random network adversary (native action spaces; transformed
++        # spaces mix post-decode in canonical dof coordinates below)
++        if self.num_actions == self.num_hand_dofs:
++            actions_delayed = self.get_random_network_adversary_action(actions_delayed)
+ 
+         if self.use_relative_control:
+ 
+@@ -997,13 +1088,35 @@ class AllegroHandDextreme(ADRVecTask):
+ 
+         else:
+ 
+-            self.cur_targets[:, self.actuated_dof_indices] = scale(actions_delayed,
+-                                                                   self.hand_dof_lower_limits[self.actuated_dof_indices],
+-                                                                   self.hand_dof_upper_limits[self.actuated_dof_indices])
++            self.cur_targets[:, self.actuated_dof_indices] = compute_hand_joint_targets(
++                actions_delayed,
++                self.prev_targets[:, self.actuated_dof_indices],
++                self.hand_dof_lower_limits[self.actuated_dof_indices],
++                self.hand_dof_upper_limits[self.actuated_dof_indices],
++                self.hand_action_transform,
++            )
+ 
+-        self.cur_targets[:, self.actuated_dof_indices] = self.act_moving_average * self.cur_targets[:,self.actuated_dof_indices] + \
+-                                                            (1.0 - self.act_moving_average) * self.prev_targets[:, self.actuated_dof_indices]
++        if self.enable_rna and self.num_actions != self.num_hand_dofs:
++            canonical_targets = unscale(
++                self.cur_targets[:, self.actuated_dof_indices],
++                self.hand_dof_lower_limits[self.actuated_dof_indices],
++                self.hand_dof_upper_limits[self.actuated_dof_indices],
++            )
++            canonical_targets = self.get_random_network_adversary_action(
++                canonical_targets
++            )
++            self.cur_targets[:, self.actuated_dof_indices] = scale(
++                canonical_targets,
++                self.hand_dof_lower_limits[self.actuated_dof_indices],
++                self.hand_dof_upper_limits[self.actuated_dof_indices],
++            )
++
++        self.cur_targets[:, self.actuated_dof_indices] = self.apply_action_noise(
++            self.cur_targets[:, self.actuated_dof_indices]
++        )
+ 
++        self.cur_targets[:, self.actuated_dof_indices] = self.act_moving_average * self.cur_targets[:, self.actuated_dof_indices] + \
++            (1.0 - self.act_moving_average) * self.prev_targets[:, self.actuated_dof_indices]
+ 
+         self.cur_targets[:, self.actuated_dof_indices] = tensor_clamp(self.cur_targets[:, self.actuated_dof_indices],
+                                                                           self.hand_dof_lower_limits[self.actuated_dof_indices], self.hand_dof_upper_limits[self.actuated_dof_indices])
+@@ -1346,6 +1459,14 @@ class AllegroHandDextreme(ADRVecTask):
+ 
+ class AllegroHandDextremeADR(AllegroHandDextreme):
+ 
++    def apply_action_noise(self, targets):
++        lower_limits = self.hand_dof_lower_limits[self.actuated_dof_indices]
++        upper_limits = self.hand_dof_upper_limits[self.actuated_dof_indices]
++        normalized_targets = unscale(targets, lower_limits, upper_limits)
++        white_noise = self.sample_gaussian_adr("affine_action_white", self.all_env_ids, trailing_dim=16)
++        normalized_targets = self.affine_actions_scaling * normalized_targets + self.affine_actions_additive + white_noise
++        return scale(normalized_targets, lower_limits, upper_limits)
++
+     def _init_pre_sim_buffers(self):
+         super()._init_pre_sim_buffers()
+         """Initialise buffers that must be initialised before sim startup."""
+@@ -1358,8 +1479,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+         self.prev_actions_queue = torch.zeros(self.cfg["env"]["numEnvs"], self.action_latency_max + 1, self.cfg["env"]["numActions"], dtype=torch.float, device=self.sim_device)
+         
+         # tensors to store random affine transforms
+-        self.affine_actions_scaling = torch.ones(self.cfg["env"]["numEnvs"], self.cfg["env"]["numActions"], dtype=torch.float, device=self.sim_device)
+-        self.affine_actions_additive = torch.zeros(self.cfg["env"]["numEnvs"], self.cfg["env"]["numActions"], dtype=torch.float, device=self.sim_device)
++        self.affine_actions_scaling = torch.ones(self.cfg["env"]["numEnvs"], 16, dtype=torch.float, device=self.sim_device)
++        self.affine_actions_additive = torch.zeros(self.cfg["env"]["numEnvs"], 16, dtype=torch.float, device=self.sim_device)
+ 
+         self.affine_cube_pose_scaling = torch.ones(self.cfg["env"]["numEnvs"], 7, dtype=torch.float, device=self.sim_device)
+         self.affine_cube_pose_additive = torch.zeros(self.cfg["env"]["numEnvs"], 7, dtype=torch.float, device=self.sim_device)
+@@ -1405,8 +1526,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+             (torch.rand(randomize_env_ids.shape, device=self.device, dtype=torch.float) \
+                 * (self.cube_pose_refresh_rate[randomize_env_ids].view(-1).float()) - 0.5).round().long() # offset range shifted back by one
+         
+-        self.affine_actions_scaling[randomize_env_ids] = 1. + self.sample_gaussian_adr("affine_action_scaling", randomize_env_ids, trailing_dim=self.num_actions)
+-        self.affine_actions_additive[randomize_env_ids] = self.sample_gaussian_adr("affine_action_additive", randomize_env_ids, trailing_dim=self.num_actions)
++        self.affine_actions_scaling[randomize_env_ids] = 1. + self.sample_gaussian_adr("affine_action_scaling", randomize_env_ids, trailing_dim=16)
++        self.affine_actions_additive[randomize_env_ids] = self.sample_gaussian_adr("affine_action_additive", randomize_env_ids, trailing_dim=16)
+ 
+         self.affine_cube_pose_scaling[randomize_env_ids] = 1. + self.sample_gaussian_adr("affine_cube_pose_scaling", randomize_env_ids, trailing_dim=7)
+         self.affine_cube_pose_additive[randomize_env_ids] = self.sample_gaussian_adr("affine_cube_pose_additive", randomize_env_ids, trailing_dim=7)
+@@ -1434,9 +1555,6 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+         actions = \
+                 self.prev_actions_queue[torch.arange(self.prev_actions_queue.shape[0]), self.action_latency] * ~action_delay_mask \
+                 + self.prev_actions * action_delay_mask
+-        
+-        white_noise = self.sample_gaussian_adr("affine_action_white", self.all_env_ids, trailing_dim=self.num_actions)
+-        actions = self.affine_actions_scaling * actions + self.affine_actions_additive + white_noise
+                     
+         return actions
+ 
+@@ -1512,7 +1630,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
+         self.cube_pose_refresh_offset = torch.randint(0, self.max_skip_obs, size=(self.num_envs,), device=self.device)
+ 
+         
+-    def get_num_obs_dict(self, num_dofs=16):
++    def get_num_obs_dict(self, num_dofs=16, num_actions=16):
+ 
+         return {"dof_pos": num_dofs,
+             "dof_vel": num_dofs,
+@@ -1528,7 +1646,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
+ 
+             "goal_relative_rot_cam": 4,
+ 
+-            "last_actions": num_dofs,
++            "last_actions": num_actions,
+             "cube_random_params": 3,
+             "hand_random_params": 1,
+             "gravity_vec": 3,
+diff --git a/isaacgymenvs/train.py b/isaacgymenvs/train.py
+index 80c3844..ba18f71 100644
+--- a/isaacgymenvs/train.py
++++ b/isaacgymenvs/train.py
+@@ -155,11 +155,12 @@ def launch_rlg_hydra(cfg: DictConfig):
+     if dict_cls:
+         
+         obs_spec = {}
++        latent_names = ['latent_state'] if cfg.task.env.get('numLatentObs', 0) else []
+         actor_net_cfg = cfg.train.params.network
+-        obs_spec['obs'] = {'names': list(actor_net_cfg.inputs.keys()), 'concat': not actor_net_cfg.name == "complex_net", 'space_name': 'observation_space'}
++        obs_spec['obs'] = {'names': list(actor_net_cfg.inputs.keys()) + latent_names, 'concat': not actor_net_cfg.name == "complex_net", 'space_name': 'observation_space'}
+         if "central_value_config" in cfg.train.params.config:
+             critic_net_cfg = cfg.train.params.config.central_value_config.network
+-            obs_spec['states'] = {'names': list(critic_net_cfg.inputs.keys()), 'concat': not critic_net_cfg.name == "complex_net", 'space_name': 'state_space'}
++            obs_spec['states'] = {'names': list(critic_net_cfg.inputs.keys()) + latent_names, 'concat': not critic_net_cfg.name == "complex_net", 'space_name': 'state_space'}
+         
+         vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: ComplexObsRLGPUEnv(config_name, num_actors, obs_spec, **kwargs))
+     else:
+@@ -194,6 +195,22 @@ def launch_rlg_hydra(cfg: DictConfig):
+ 
+     # convert CLI arguments into dictionary
+     # create runner and set the settings
++    if os.environ.get("ACTION_BENCH_BUNDLE"):
++        from isaacgymenvs.release_bundle import MetricsObserver
++        observers.append(MetricsObserver())
++    settings = os.environ.get("EIGENDEXPLORE_SETTINGS")
++    if settings:
++        import json
++        from eigendexplore.rl_games import configure
++        with open(settings) as stream:
++            configure(rlg_config_dict["params"], json.load(stream))
++
++    recording = None
++    if os.environ.get("ACTION_BENCH_RECORD_DIR") and global_rank == 0:
++        from isaacgymenvs.release_recording import RecordingObserver
++        recording = RecordingObserver()
++        observers.append(recording)
++
+     runner = build_runner(MultiObserver(observers))
+     runner.load(rlg_config_dict)
+     runner.reset()
+@@ -207,12 +224,16 @@ def launch_rlg_hydra(cfg: DictConfig):
+         with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
+             f.write(OmegaConf.to_yaml(cfg))
+ 
+-    runner.run({
+-        'train': not cfg.test,
+-        'play': cfg.test,
+-        'checkpoint': cfg.checkpoint,
+-        'sigma': cfg.sigma if cfg.sigma != '' else None
+-    })
++    try:
++        runner.run({
++            'train': not cfg.test,
++            'play': cfg.test,
++            'checkpoint': cfg.checkpoint,
++            'sigma': cfg.sigma if cfg.sigma != '' else None
++        })
++    finally:
++        if recording is not None:
++            recording.close()
+ 
+ 
+ if __name__ == "__main__":
