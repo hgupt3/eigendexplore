@@ -14,7 +14,16 @@ from .exploration import policy_noise
 from .settings import benchmark_defaults
 
 
-def prepare_run(study, args):
+def _policy_file(path):
+    path = path.expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    return path
+
+
+def prepare_run(study, args, *, play=False):
+    """Training resumes or initializes from a checkpoint; play runs its mean action for one
+    episode in each environment."""
     if type(args.seed) is not int or not 0 <= args.seed < 2**32:
         raise ValueError("seed must be an integer from 0 through 4294967295")
     installation = json.loads(args.installation.read_text())
@@ -32,15 +41,20 @@ def prepare_run(study, args):
     if root.exists():
         raise FileExistsError(f"run directory already exists: {root}")
     defaults = benchmark_defaults(study.benchmark)
-    if args.max_epochs is not None and args.max_epochs < 1:
-        raise ValueError("--max-epochs must be positive")
     if args.num_envs is not None and args.num_envs < 1:
         raise ValueError("--num-envs must be positive")
-    count = args.num_envs or defaults["num_envs"]
-    if study.benchmark == "dextreme" and count % 1024:
-        raise ValueError("DeXtreme PPO num-envs must be a multiple of 1024")
-    if study.benchmark == "simtoolreal" and count % 12288:
-        raise ValueError("SimToolReal SAPG num-envs must be a multiple of 12288")
+    if play:
+        count = args.num_envs or defaults["play_num_envs"]
+        max_epochs = None
+    else:
+        max_epochs = args.max_epochs
+        if max_epochs is not None and max_epochs < 1:
+            raise ValueError("--max-epochs must be positive")
+        count = args.num_envs or defaults["num_envs"]
+        if study.benchmark == "dextreme" and count % 1024:
+            raise ValueError("DeXtreme PPO num-envs must be a multiple of 1024")
+        if study.benchmark == "simtoolreal" and count % 12288:
+            raise ValueError("SimToolReal SAPG num-envs must be a multiple of 12288")
     record = getattr(args, "record", False)
     record_every = getattr(args, "record_every_epochs", None)
     if record_every is not None and (not record or record_every < 1):
@@ -57,10 +71,14 @@ def prepare_run(study, args):
         if study.k is not None
         else None,
     }
-    if args.checkpoint is not None:
-        checkpoint = args.checkpoint.expanduser().resolve()
-        if not checkpoint.is_file():
-            raise FileNotFoundError(checkpoint)
+    init_weights = None
+    if play:
+        # Any checkpoint of the same study: a released policy or a run's own.
+        checkpoint = _policy_file(args.checkpoint)
+    elif args.checkpoint is not None:
+        if args.init_weights is not None:
+            raise ValueError("--checkpoint resumes a run; --init-weights starts one")
+        checkpoint = _policy_file(args.checkpoint)
         # Resume only an identified release run with the exact resolved study.
         origins = [
             p / "launch.json"
@@ -76,6 +94,9 @@ def prepare_run(study, args):
             )
     else:
         checkpoint = None
+        if args.init_weights is not None:
+            # Policy, critic and normalizers; optimizer, counters and curricula start fresh.
+            init_weights = _policy_file(args.init_weights)
     root.mkdir(parents=True)
     (root / "installation.json").write_text(json.dumps(installation, indent=2) + "\n")
     config_path = root / "study.yaml"
@@ -137,14 +158,37 @@ def prepare_run(study, args):
             "task.task.adr.params.action_delay_prob.limits=[0,0]",
             "task.task.adr.params.action_delay_prob.delta=0.0",
         ]
-        if args.max_epochs is not None:
-            command.append(f"max_iterations={args.max_epochs}")
-        if checkpoint is not None:
+        if max_epochs is not None:
+            command.append(f"max_iterations={max_epochs}")
+        if play:
+            # The paper's evaluation: each environment plays one full episode with ADR
+            # frozen at fixed ranges and a fixed action EMA; the player prints the means.
+            ema = defaults["play_action_ema"]
+            command += [
+                "test=True",
+                f"checkpoint={checkpoint}",
+                "task.env.randomizeInitialProgress=False",
+                f"task.env.maxConsecutiveSuccesses={defaults['play_max_consecutive_successes']}",
+                f"task.env.actionsMovingAverage.range=[{ema},{ema}]",
+                "task.task.adr.update_adr_ranges=False",
+                *(
+                    f"task.task.adr.params.{name}.init_range=[{low},{high}]"
+                    for name, (low, high) in defaults["play_adr_ranges"].items()
+                ),
+                "train.params.config.player.deterministic=True",
+                "+train.params.config.player.one_episode_per_env=True",
+                "+train.params.config.player.success_key=true_objective",
+            ]
+        elif checkpoint is not None:
             command += [
                 f"checkpoint={checkpoint}",
                 "task.task.adr.adr_load_from_checkpoint=True",
             ]
+        elif init_weights is not None:
+            command += [f"checkpoint={init_weights}", "checkpoint_load_mode=weights"]
     else:  # simtoolreal
+        # Play starts the curriculum at its floor, where it stays.
+        tolerance = defaults["play_success_tolerance" if play else "success_tolerance"]
         command += [
             str(host / "isaacsimenvs/train.py"),
             "--task",
@@ -154,17 +198,34 @@ def prepare_run(study, args):
             "--headless",
             f"env.scene.num_envs={count}",
             "env.action.hand_moving_average=0.1",
-            f"env.termination.success_tolerance={defaults['success_tolerance']}",
+            f"env.termination.success_tolerance={tolerance}",
             f"env.termination.tolerance_curriculum_start_frames={defaults['curriculum_start_frames']}",
             f"agent.params.seed={args.seed}",
             f"agent.params.config.name=0_{name}",
             f"hydra.run.dir={root}",
         ]
-        if args.max_epochs is not None:
-            command.append(f"agent.params.config.max_epochs={args.max_epochs}")
-        if checkpoint is not None:
+        if max_epochs is not None:
+            command.append(f"agent.params.config.max_epochs={max_epochs}")
+        if play:
+            command += [
+                "--test",
+                "--checkpoint",
+                str(checkpoint),
+                "agent.params.config.player.deterministic=True",
+                "+agent.params.config.player.one_episode_per_env=True",
+                "+agent.params.config.player.success_key=episode_final.successes",
+            ]
+        elif checkpoint is not None:
             command += ["--checkpoint", str(checkpoint)]
+        elif init_weights is not None:
+            command += [
+                "--checkpoint",
+                str(init_weights),
+                "--checkpoint_load_mode",
+                "weights",
+            ]
     plan = {
+        "mode": "play" if play else "train",
         "recording": {"enabled": record, "every_epochs": record_every},
         "identity": identity,
         "study": study.model_dump(mode="json"),
@@ -172,6 +233,7 @@ def prepare_run(study, args):
         "num_envs": count,
         "host_commit": head,
         "checkpoint": str(checkpoint) if checkpoint else None,
+        "init_weights": str(init_weights) if init_weights else None,
         "command": command,
         "environment": env,
         "cwd": str(host),
@@ -202,7 +264,7 @@ def execute_run(plan):
             asset_roots({"benchmark": plan["study"]["benchmark"], "host": plan["cwd"]}),
         )
     try:
-        with open(Path(plan["output"]) / "train.log", "a") as log:
+        with open(Path(plan["output"]) / f"{plan['mode']}.log", "a") as log:
             process = subprocess.Popen(
                 plan["command"],
                 cwd=plan["cwd"],

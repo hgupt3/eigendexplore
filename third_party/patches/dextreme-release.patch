@@ -1,8 +1,21 @@
+diff --git a/isaacgymenvs/cfg/config.yaml b/isaacgymenvs/cfg/config.yaml
+index b00cd71..7e3255d 100644
+--- a/isaacgymenvs/cfg/config.yaml
++++ b/isaacgymenvs/cfg/config.yaml
+@@ -36,6 +36,8 @@ num_subscenes: 4 # Splits the simulation into N physics scenes and runs each one
+ test: False
+ # used to set checkpoint path
+ checkpoint: ''
++# resume: full training state; weights: policy, critic and normalizers only
++checkpoint_load_mode: resume
+ # set sigma when restoring network
+ sigma: ''
+ # set to True to use multi-gpu training
 diff --git a/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml b/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
-index 8836fef..280f806 100644
+index 8836fef..215402f 100644
 --- a/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
 +++ b/isaacgymenvs/cfg/task/AllegroHandDextremeADR.yaml
-@@ -6,6 +6,8 @@ physics_engine: ${..physics_engine}
+@@ -6,9 +6,12 @@ physics_engine: ${..physics_engine}
  # if given, will override the device setting in gym.
  env: 
    numEnvs: ${resolve_default:16384,${...num_envs}}
@@ -11,6 +24,10 @@ index 8836fef..280f806 100644
    envSpacing: 0.75
    episodeLength: 320 # Not used, but would be 8 sec if resetTime is not set
    resetTime: 8 # Max time till reset, in seconds, if a goal wasn't achieved. Will overwrite the episodeLength if is > 0.
++  randomizeInitialProgress: True # Start the first episodes at random progress, so timeouts spread out; play starts them at zero.
+   enableDebugVis: False
+   aggregateMode: 1
+ 
 diff --git a/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml b/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml
 index 01cf084..1f46e4a 100644
 --- a/isaacgymenvs/cfg/task/AllegroHandDextremeManualDR.yaml
@@ -126,10 +143,10 @@ index 0000000..78b1ad1
 +                self.writer.add_scalar(key, value, frame)
 diff --git a/isaacgymenvs/release_recording.py b/isaacgymenvs/release_recording.py
 new file mode 100644
-index 0000000..035c917
+index 0000000..9d9daec
 --- /dev/null
 +++ b/isaacgymenvs/release_recording.py
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,102 @@
 +"""Optional state recording through the shared Python 3.8 capture modules."""
 +import importlib.util
 +import os
@@ -202,23 +219,27 @@ index 0000000..035c917
 +        self.capture = None
 +        self.task = None
 +
-+    def after_init(self, algo):
-+        _, Observer = recording_modules()
-+        self.task = algo.vec_env.env
-+        self.capture = build_capture(self.task, os.environ['ACTION_BENCH_RECORD_DIR'])
-+        schedule = [{'every_epochs': 60, 'through_epoch': 380},
-+                    {'every_epochs': 130, 'through_epoch': None}]
-+        self.observer = Observer(self.capture, schedule, AlgoObserver())
-+        scale = self.task.gym.get_actor_scale(self.task.envs[0], self.task.allegro_hands[0])
-+        self.robot_scale = self.task.dof_pos.new_full((3,), scale)
-+        self.observer.after_init(algo)
-+        self.original_step = self.task.post_physics_step
++    def attach(self, task):
++        """Append environment 0 after each physics step while a capture is armed."""
++        self.task = task
++        self.capture = build_capture(task, os.environ['ACTION_BENCH_RECORD_DIR'])
++        scale = task.gym.get_actor_scale(task.envs[0], task.allegro_hands[0])
++        self.robot_scale = task.dof_pos.new_full((3,), scale)
++        self.original_step = task.post_physics_step
 +        def step():
 +            result = self.original_step()
 +            if self.capture.active:
-+                self.capture.append(capture_rows(self.task, self.robot_scale))
++                self.capture.append(capture_rows(task, self.robot_scale))
 +            return result
-+        self.task.post_physics_step = step
++        task.post_physics_step = step
++
++    def after_init(self, algo):
++        _, Observer = recording_modules()
++        self.attach(algo.vec_env.env)
++        schedule = [{'every_epochs': 60, 'through_epoch': 380},
++                    {'every_epochs': 130, 'through_epoch': None}]
++        self.observer = Observer(self.capture, schedule, AlgoObserver())
++        self.observer.after_init(algo)
 +
 +    def after_print_stats(self, frame, epoch_num, total_time):
 +        self.observer.after_print_stats(frame, epoch_num, total_time)
@@ -258,7 +279,7 @@ index 1e76317..2073710 100644
              if not already_recycled: 
                  self.recycle_envs(rand_envs)
 diff --git a/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py b/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
-index 89d0a46..8c13d47 100644
+index 89d0a46..7afe80b 100644
 --- a/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
 +++ b/isaacgymenvs/tasks/dextreme/allegro_hand_dextreme.py
 @@ -52,8 +52,60 @@ from isaacgymenvs.utils.torch_jit_utils import quaternion_to_matrix, matrix_to_q
@@ -418,6 +439,15 @@ index 89d0a46..8c13d47 100644
  
      def get_random_quat(self, env_ids):
  
+@@ -845,7 +924,7 @@ class AllegroHandDextreme(ADRVecTask):
+         self.obs_object_pose[env_ids] = self.object_pose_wrt_wrist[env_ids].clone()
+         self.obs_object_pose_freq[env_ids] = self.object_pose_wrt_wrist[env_ids].clone()
+ 
+-        if self.use_adr and len(env_ids) == self.num_envs:
++        if self.use_adr and self.randomize_initial_progress and len(env_ids) == self.num_envs:
+             self.progress_buf = torch.randint(0, self.max_episode_length, size=(self.num_envs,), dtype=torch.long, device=self.device)
+         else:
+             self.progress_buf[env_ids] = 0
 @@ -856,6 +935,8 @@ class AllegroHandDextreme(ADRVecTask):
          self.successes[env_ids] = 0
          self.best_rotation_dist[env_ids] = -1
@@ -510,7 +540,15 @@ index 89d0a46..8c13d47 100644
  
          self.cur_targets[:, self.actuated_dof_indices] = tensor_clamp(self.cur_targets[:, self.actuated_dof_indices],
                                                                            self.hand_dof_lower_limits[self.actuated_dof_indices], self.hand_dof_upper_limits[self.actuated_dof_indices])
-@@ -1346,6 +1459,14 @@ class AllegroHandDextreme(ADRVecTask):
+@@ -1158,6 +1271,7 @@ class AllegroHandDextreme(ADRVecTask):
+ 
+         self.max_episode_length = self.cfg["env"]["episodeLength"]
+         self.reset_time = self.cfg["env"].get("resetTime", -1.0)
++        self.randomize_initial_progress = self.cfg["env"].get("randomizeInitialProgress", True)
+         self.print_success_stat = self.cfg["env"]["printNumSuccesses"]
+         self.eval_stats_name = self.cfg["env"].get("evalStatsName", '')
+         self.num_eval_frames = self.cfg["env"].get("numEvalFrames", None)
+@@ -1346,6 +1460,14 @@ class AllegroHandDextreme(ADRVecTask):
  
  class AllegroHandDextremeADR(AllegroHandDextreme):
  
@@ -525,7 +563,7 @@ index 89d0a46..8c13d47 100644
      def _init_pre_sim_buffers(self):
          super()._init_pre_sim_buffers()
          """Initialise buffers that must be initialised before sim startup."""
-@@ -1358,8 +1479,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+@@ -1358,8 +1480,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
          self.prev_actions_queue = torch.zeros(self.cfg["env"]["numEnvs"], self.action_latency_max + 1, self.cfg["env"]["numActions"], dtype=torch.float, device=self.sim_device)
          
          # tensors to store random affine transforms
@@ -536,7 +574,7 @@ index 89d0a46..8c13d47 100644
  
          self.affine_cube_pose_scaling = torch.ones(self.cfg["env"]["numEnvs"], 7, dtype=torch.float, device=self.sim_device)
          self.affine_cube_pose_additive = torch.zeros(self.cfg["env"]["numEnvs"], 7, dtype=torch.float, device=self.sim_device)
-@@ -1405,8 +1526,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+@@ -1405,8 +1527,8 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
              (torch.rand(randomize_env_ids.shape, device=self.device, dtype=torch.float) \
                  * (self.cube_pose_refresh_rate[randomize_env_ids].view(-1).float()) - 0.5).round().long() # offset range shifted back by one
          
@@ -547,7 +585,7 @@ index 89d0a46..8c13d47 100644
  
          self.affine_cube_pose_scaling[randomize_env_ids] = 1. + self.sample_gaussian_adr("affine_cube_pose_scaling", randomize_env_ids, trailing_dim=7)
          self.affine_cube_pose_additive[randomize_env_ids] = self.sample_gaussian_adr("affine_cube_pose_additive", randomize_env_ids, trailing_dim=7)
-@@ -1434,9 +1555,6 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
+@@ -1434,9 +1556,6 @@ class AllegroHandDextremeADR(AllegroHandDextreme):
          actions = \
                  self.prev_actions_queue[torch.arange(self.prev_actions_queue.shape[0]), self.action_latency] * ~action_delay_mask \
                  + self.prev_actions * action_delay_mask
@@ -557,7 +595,7 @@ index 89d0a46..8c13d47 100644
                      
          return actions
  
-@@ -1512,7 +1630,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
+@@ -1512,7 +1631,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
          self.cube_pose_refresh_offset = torch.randint(0, self.max_skip_obs, size=(self.num_envs,), device=self.device)
  
          
@@ -566,7 +604,7 @@ index 89d0a46..8c13d47 100644
  
          return {"dof_pos": num_dofs,
              "dof_vel": num_dofs,
-@@ -1528,7 +1646,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
+@@ -1528,7 +1647,7 @@ class AllegroHandDextremeManualDR(AllegroHandDextreme):
  
              "goal_relative_rot_cam": 4,
  
@@ -576,10 +614,20 @@ index 89d0a46..8c13d47 100644
              "hand_random_params": 1,
              "gravity_vec": 3,
 diff --git a/isaacgymenvs/train.py b/isaacgymenvs/train.py
-index 80c3844..ba18f71 100644
+index 80c3844..115fa87 100644
 --- a/isaacgymenvs/train.py
 +++ b/isaacgymenvs/train.py
-@@ -155,11 +155,12 @@ def launch_rlg_hydra(cfg: DictConfig):
+@@ -142,6 +142,9 @@ def launch_rlg_hydra(cfg: DictConfig):
+                 step_trigger=lambda step: step % cfg.capture_video_freq == 0,
+                 video_length=cfg.capture_video_len,
+             )
++        if cfg.test and recording is not None:
++            recording.attach(envs)
++            recording.capture.arm(0, 0)
+         return envs
+ 
+     env_configurations.register('rlgpu', {
+@@ -155,11 +158,12 @@ def launch_rlg_hydra(cfg: DictConfig):
      if dict_cls:
          
          obs_spec = {}
@@ -594,7 +642,7 @@ index 80c3844..ba18f71 100644
          
          vecenv.register('RLGPU', lambda config_name, num_actors, **kwargs: ComplexObsRLGPUEnv(config_name, num_actors, obs_spec, **kwargs))
      else:
-@@ -194,6 +195,22 @@ def launch_rlg_hydra(cfg: DictConfig):
+@@ -194,6 +198,23 @@ def launch_rlg_hydra(cfg: DictConfig):
  
      # convert CLI arguments into dictionary
      # create runner and set the settings
@@ -612,12 +660,13 @@ index 80c3844..ba18f71 100644
 +    if os.environ.get("ACTION_BENCH_RECORD_DIR") and global_rank == 0:
 +        from isaacgymenvs.release_recording import RecordingObserver
 +        recording = RecordingObserver()
-+        observers.append(recording)
++        if not cfg.test:
++            observers.append(recording)
 +
      runner = build_runner(MultiObserver(observers))
      runner.load(rlg_config_dict)
      runner.reset()
-@@ -207,12 +224,16 @@ def launch_rlg_hydra(cfg: DictConfig):
+@@ -207,12 +228,20 @@ def launch_rlg_hydra(cfg: DictConfig):
          with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
              f.write(OmegaConf.to_yaml(cfg))
  
@@ -627,13 +676,17 @@ index 80c3844..ba18f71 100644
 -        'checkpoint': cfg.checkpoint,
 -        'sigma': cfg.sigma if cfg.sigma != '' else None
 -    })
++    import torch
 +    try:
-+        runner.run({
-+            'train': not cfg.test,
-+            'play': cfg.test,
-+            'checkpoint': cfg.checkpoint,
-+            'sigma': cfg.sigma if cfg.sigma != '' else None
-+        })
++        # Training rollouts already run without autograd; playing matches them.
++        with torch.set_grad_enabled(not cfg.test):
++            runner.run({
++                'train': not cfg.test,
++                'play': cfg.test,
++                'checkpoint': cfg.checkpoint,
++                'checkpoint_load_mode': cfg.checkpoint_load_mode,
++                'sigma': cfg.sigma if cfg.sigma != '' else None
++            })
 +    finally:
 +        if recording is not None:
 +            recording.close()

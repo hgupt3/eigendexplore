@@ -1,6 +1,39 @@
 benchmark: dextreme
 hands: [allegro]
 num_envs: 16384
+play_num_envs: 1024
+# Play follows the paper's evaluation: ADR frozen at DR level -0.5 (nats per
+# dimension), the action EMA where its schedule ends at 2B frames, and at most
+# 30 consecutive successes. action_delay_prob stays at its training range [0, 0].
+play_max_consecutive_successes: 30
+play_action_ema: 0.1878
+play_adr_ranges:
+  hand_damping: [0.352397362028, 2.22140395696]
+  hand_stiffness: [0.566295823211, 1.44600439662]
+  hand_joint_friction: [0.55399560338, 1.44600439662]
+  hand_armature: [0.55399560338, 1.43370417679]
+  hand_effort: [0.65399560338, 1.34600439662]
+  hand_lower: [-0.492008793239, 0.442807913915]
+  hand_upper: [-0.393607034591, 0.492008793239]
+  hand_mass: [0.55399560338, 1.44600439662]
+  hand_friction_fingertips: [0.65399560338, 1.34600439662]
+  hand_restitution: [0, 0.34600439662]
+  object_mass: [0.55399560338, 1.44600439662]
+  object_friction: [0.166295823211, 1.04600439662]
+  object_restitution: [0, 0.34600439662]
+  cube_obs_delay_prob: [0, 0.283704176789]
+  cube_pose_refresh_rate: [1, 5.67408353577]
+  action_latency: [0, 2.33704176789]
+  affine_action_scaling: [0, 0]
+  affine_action_additive: [0, 0.273704176789]
+  affine_action_white: [0, 0.273704176789]
+  affine_cube_pose_scaling: [0, 0]
+  affine_cube_pose_additive: [0, 0.212203077634]
+  affine_cube_pose_white: [0, 0.249103737127]
+  affine_dof_pos_scaling: [0, 0]
+  affine_dof_pos_additive: [0, 0.273704176789]
+  affine_dof_pos_white: [0, 0.28600439662]
+  rna_alpha: [0, 0.24600439662]
 control_hz: 30.0
 target_ema: 0.175
 methods:

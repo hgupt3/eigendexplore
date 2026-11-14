@@ -94,6 +94,47 @@ An RL run trains one seed. To run more seeds, repeat the command with a differen
 
 DeXtreme and SimToolReal run all six. Defaults for each benchmark are in [`src/action_bench/presets/`](src/action_bench/presets); change one with `action-bench config ... --set name=value`.
 
+### Pretrained policies
+
+The [v0.3.0 release](https://github.com/hgupt3/eigendexplore/releases/tag/v0.3.0) has the four policies from the paper's real-robot trials. Each file holds the policy, its learned exploration noise, the critic and both normalizers. It holds no optimizer state or training counters.
+
+| File | Benchmark | Method | Seed | Training frames |
+| --- | --- | --- | --- | --- |
+| `simtoolreal-sharpa-joint_absolute.pth` | SimToolReal | Joint-Space | 13 | 61.1B |
+| `simtoolreal-sharpa-eigendexplore.pth` | SimToolReal | EigenDExplore | 202 | 60.9B |
+| `dextreme-allegro-joint_absolute.pth` | DeXtreme | Joint-Space | 7 | 2.0B |
+| `dextreme-allegro-eigendexplore.pth` | DeXtreme | EigenDExplore | 42 | 2.0B |
+
+```bash
+AB_POLICIES="$AB_WORK/policies"
+mkdir -p "$AB_POLICIES"
+for file in simtoolreal-sharpa-joint_absolute.pth simtoolreal-sharpa-eigendexplore.pth \
+    dextreme-allegro-joint_absolute.pth dextreme-allegro-eigendexplore.pth; do
+  curl -fL -o "$AB_POLICIES/$file" "https://github.com/hgupt3/eigendexplore/releases/download/v0.3.0/$file"
+done
+```
+
+After installing a policy's benchmark, play it. Each of 1024 environments runs the policy's mean action for one episode, and play prints the mean consecutive successes over those episodes. `--record` adds a video of the first 30 seconds:
+
+```bash
+action-bench config --benchmark simtoolreal --hand sharpa --method eigendexplore > study.yaml
+action-bench play study.yaml --installation "$AB_WORK/simtoolreal/installation.json" \
+  --checkpoint "$AB_POLICIES/simtoolreal-sharpa-eigendexplore.pth" \
+  --output runs/play/simtoolreal-eigendexplore --gpu 0 --record
+```
+
+The study must name the policy's method. The default settings are the ones these policies trained with. SimToolReal plays at the curriculum's final tolerance (1 cm). DeXtreme plays as the paper evaluated it: ADR frozen at DR level −0.5, at most 30 consecutive successes.
+
+To fine-tune, start a run from the policy's weights:
+
+```bash
+action-bench run study.yaml --installation "$AB_WORK/simtoolreal/installation.json" \
+  --init-weights "$AB_POLICIES/simtoolreal-sharpa-eigendexplore.pth" \
+  --output runs/simtoolreal/eigendexplore/finetune-101 --seed 101 --gpu 0
+```
+
+`--init-weights` loads the policy, noise scales, critic and normalizers. The optimizer, epoch counter and curricula (the SimToolReal tolerance and DeXtreme ADR) start fresh. SimToolReal keeps a policy embedding and noise scales for each 4096-environment SAPG block, so fine-tune its policies at the default 24576 environments. To continue one of your own runs with its full training state, use `--checkpoint` instead.
+
 ### Videos
 
 Add `--record` to an RL run to save scheduled 30-second state captures and render them to MP4. It needs the renderer in the core environment (Ubuntu also needs `libosmesa6`):
@@ -103,7 +144,7 @@ Add `--record` to an RL run to save scheduled 30-second state captures and rende
 "$AB_CORE" -m pip install --no-deps PyOpenGL==3.1.10
 ```
 
-Videos appear as `recordings/step_<epoch>.mp4` in the run directory. Re-render a capture with `action-bench render <capture-dir> --installation <installation.json> --output out.mp4`. For SPIDER, `--record` saves each episode's video.
+Videos appear as `recordings/step_<epoch>.mp4` in the run directory (epoch 0 for `play`). Re-render a capture with `action-bench render <capture-dir> --installation <installation.json> --output out.mp4`. For SPIDER, `--record` saves each episode's video.
 
 ## Repository layout
 

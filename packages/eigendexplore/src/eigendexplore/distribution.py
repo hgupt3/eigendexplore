@@ -4,8 +4,169 @@ import math
 from typing import Optional
 
 import torch
+import torch.nn.functional as F
 from torch import nn
-from torch.distributions import LowRankMultivariateNormal, kl_divergence
+from torch.distributions import Distribution, constraints, kl_divergence, register_kl
+from torch.distributions.utils import lazy_property
+
+_LOG_2PI = math.log(2 * math.pi)
+
+
+def _eigen_gram(weights, basis):
+    """``B @ diag(weights) @ B.T`` for each row of weights, as one matrix product."""
+    rank = basis.shape[0]
+    outer = (basis.T.unsqueeze(-1) * basis.T.unsqueeze(-2)).reshape(-1, rank * rank)
+    return (weights @ outer).unflatten(-1, (rank, rank))
+
+
+def _invert_lower(tril):
+    eye = torch.eye(tril.shape[-1], device=tril.device, dtype=tril.dtype)
+    return torch.linalg.solve_triangular(tril, eye, upper=False)
+
+
+class EigenDExploreDistribution(Distribution):
+    """Gaussian with covariance ``diag(iid_sigma**2) + B.T @ diag(eigen_sigma**2) @ B``.
+
+    Likelihood, entropy and KL use the Woodbury identity, so every solve has the
+    basis rank. The rank-by-rank factorization follows the scales' own batch
+    shape: scales shared across a batch are factorized once, and with ``group``
+    each row of per-group scales is factorized once and looked up per sample.
+    Nothing synchronizes with the host. Construct it through
+    ``EigenDExplore.distribution``.
+    """
+
+    arg_constraints = {}
+    support = constraints.real_vector
+    has_rsample = True
+
+    def __init__(self, loc, iid_sigma, eigen_sigma, basis, group=None):
+        rank, width = basis.shape
+        self.loc, self.basis, self._group = loc, basis, group
+        variance = iid_sigma.square()
+        # Eigen-space precision of the IID part, B @ diag(iid_sigma**-2) @ B.T.
+        self._scale_precision = _eigen_gram(variance.reciprocal(), basis)
+        capacitance = (
+            eigen_sigma.unsqueeze(-1)
+            * self._scale_precision
+            * eigen_sigma.unsqueeze(-2)
+        )
+        capacitance = capacitance + torch.eye(
+            rank, device=basis.device, dtype=basis.dtype
+        )
+        # Identity plus a positive semidefinite matrix: always positive definite.
+        self._scale_tril = torch.linalg.cholesky_ex(capacitance).L
+        # log det(cov) = sum(log iid variance) + log det(capacitance).
+        low_rank = 2 * self._scale_tril.diagonal(dim1=-2, dim2=-1).log().sum(-1)
+        if group is not None:
+            iid_sigma, eigen_sigma, low_rank, inverse = self._select(
+                iid_sigma,
+                eigen_sigma,
+                low_rank.unsqueeze(-1),
+                _invert_lower(self._scale_tril).flatten(-2),
+            )
+            low_rank = low_rank.squeeze(-1)
+            self._tril_inverse = inverse.unflatten(-1, (rank, rank))
+        self.iid_sigma, self.eigen_sigma = iid_sigma, eigen_sigma
+        self._iid_variance = iid_sigma.square()
+        self._low_rank_log_det = low_rank
+        self._log_det = self._iid_variance.log().sum(-1) + low_rank
+        batch_shape = torch.broadcast_shapes(
+            loc.shape[:-1], iid_sigma.shape[:-1], eigen_sigma.shape[:-1]
+        )
+        super().__init__(batch_shape, (width,), validate_args=False)
+
+    def _select(self, *tables):
+        """Each sample's rows of per-group tables, with one lookup."""
+        rows = F.embedding(self._group, torch.cat(tables, -1))
+        return rows.split([table.shape[-1] for table in tables], -1)
+
+    @lazy_property
+    def _tril_inverse(self):
+        return _invert_lower(self._scale_tril)
+
+    @lazy_property
+    def _precision(self):
+        if self._group is None:
+            return self._scale_precision
+        rank = self.basis.shape[0]
+        (rows,) = self._select(self._scale_precision.flatten(-2))
+        return rows.unflatten(-1, (rank, rank))
+
+    def _mahalanobis(self, diff):
+        scaled = diff / self._iid_variance
+        eigen = self.eigen_sigma * (scaled @ self.basis.T)
+        inverse = self._tril_inverse
+        if inverse.ndim == 2:
+            eigen = eigen @ inverse.mT
+        else:  # tiny per-sample matrices: elementwise beats batched products
+            eigen = (inverse * eigen.unsqueeze(-2)).sum(-1)
+        return (diff * scaled).sum(-1) - eigen.square().sum(-1)
+
+    @property
+    def mean(self):
+        return self.loc.expand(self.batch_shape + self.event_shape)
+
+    @property
+    def mode(self):
+        return self.mean
+
+    @property
+    def variance(self):
+        eigen = self.eigen_sigma.square() @ self.basis.square()
+        return (self._iid_variance + eigen).expand(self.batch_shape + self.event_shape)
+
+    @property
+    def covariance_matrix(self):
+        factor = self.basis.T * self.eigen_sigma.unsqueeze(-2)
+        covariance = torch.diag_embed(self._iid_variance) + factor @ factor.mT
+        return covariance.expand(self.batch_shape + self.event_shape * 2)
+
+    def rsample(self, sample_shape=torch.Size()):
+        shape = self._extended_shape(sample_shape)
+        options = {"device": self.loc.device, "dtype": self.loc.dtype}
+        eta = torch.randn(shape[:-1] + self.basis.shape[:1], **options)
+        iid = torch.randn(shape, **options)
+        return self.loc + (self.eigen_sigma * eta) @ self.basis + self.iid_sigma * iid
+
+    def log_prob(self, value):
+        return -0.5 * (
+            self.event_shape[0] * _LOG_2PI
+            + self._log_det
+            + self._mahalanobis(value - self.loc)
+        )
+
+    def entropy(self):
+        entropy = 0.5 * (self.event_shape[0] * (1 + _LOG_2PI) + self._log_det)
+        return entropy.expand(self.batch_shape)
+
+
+@register_kl(EigenDExploreDistribution, EigenDExploreDistribution)
+def _kl_eigendexplore(p, q):
+    """Exact KL(p || q) for two distributions over the same basis."""
+    if p.basis is not q.basis:
+        raise ValueError("KL needs both distributions from the same EigenDExplore")
+    # With q_cov**-1 = D**-1 - D**-1 W C**-1 W.T D**-1 (Woodbury), the trace and
+    # Mahalanobis terms share one rank-by-rank correction,
+    # tr(C**-1 @ W.T D**-1 (p_cov + diff diff.T) D**-1 W), all in q's scales.
+    inverse = q._tril_inverse
+    diff = p.loc - q.loc
+    scaled = diff / q._iid_variance
+    eigen = scaled @ q.basis.T
+    cross = q._precision * p.eigen_sigma.unsqueeze(-2)
+    inner = _eigen_gram(p._iid_variance / q._iid_variance.square(), q.basis)
+    inner = inner + cross @ cross.mT + eigen.unsqueeze(-1) * eigen.unsqueeze(-2)
+    inner = q.eigen_sigma.unsqueeze(-1) * inner * q.eigen_sigma.unsqueeze(-2)
+    correction = ((inverse.mT @ inverse) * inner).sum((-2, -1))
+    # The IID terms pair per action as r - 1 - log r, which stays accurate in
+    # float32 when the policies are close.
+    ratio = p._iid_variance / q._iid_variance
+    low_rank = (p.eigen_sigma.square() * q._precision.diagonal(dim1=-2, dim2=-1)).sum(
+        -1
+    )
+    low_rank = low_rank - correction + q._low_rank_log_det - p._low_rank_log_det
+    return 0.5 * (
+        (ratio - 1 - ratio.log()).sum(-1) + (diff * scaled).sum(-1) + low_rank
+    )
 
 
 class EigenDExplore(nn.Module):
@@ -197,6 +358,7 @@ class EigenDExplore(nn.Module):
         *,
         eigen_sigma: Optional[torch.Tensor] = None,
         state: Optional[torch.Tensor] = None,
+        group: Optional[torch.Tensor] = None,
     ):
         """Return the exact action-space marginal, with differentiable entropy.
 
@@ -204,18 +366,27 @@ class EigenDExplore(nn.Module):
         from (see ``sample``) to get its likelihood. The mean then shifts by
         ``rho * B.T @ (eigen_sigma * state)`` and the Eigen scales shrink by
         ``sqrt(1 - rho**2)``. Without ``state`` this is the per-step marginal.
-        The caller guarantees finite means and positive finite IID sigmas.
-        Disabling distribution value validation avoids GPU synchronization.
+
+        Scales shared across the batch (shape ``(action_dim,)`` and ``(rank,)``)
+        cost one rank-by-rank factorization. For several policies, pass their
+        scales as rows, shape ``(policies, action_dim)`` and ``(policies, rank)``,
+        and ``group``, the integer row of each mean; each row is factorized once.
+        The caller guarantees finite means, positive finite IID sigmas and valid
+        rows; nothing is checked on the device or synchronizes with the host.
         """
-        eigen_sigma = self._eigen_sigma(mean, iid_sigma, eigen_sigma)
+        eigen_sigma = self._eigen_sigma(mean, iid_sigma, eigen_sigma, group)
+        if group is not None:
+            iid_sigma = iid_sigma.expand(len(eigen_sigma), -1)
         with torch.autocast(device_type=mean.device.type, enabled=False):
             if state is not None and self.correlation > 0:
                 self._check_state(mean, state)
-                mean = mean + (self.correlation * eigen_sigma * state) @ self.basis
+                selected = (
+                    eigen_sigma if group is None else F.embedding(group, eigen_sigma)
+                )
+                mean = mean + (self.correlation * selected * state) @ self.basis
                 eigen_sigma = eigen_sigma * math.sqrt(1 - self.correlation**2)
-            factor = self.basis.T * eigen_sigma.unsqueeze(-2)
-            return LowRankMultivariateNormal(
-                mean, factor, iid_sigma.square(), validate_args=False
+            return EigenDExploreDistribution(
+                mean, iid_sigma, eigen_sigma, self.basis, group=group
             )
 
     def initial_state(self, batch_shape=()) -> torch.Tensor:
@@ -241,8 +412,9 @@ class EigenDExplore(nn.Module):
         """
         eigen_sigma = self._eigen_sigma(mean, iid_sigma, eigen_sigma)
         self._check_state(mean, state)
-        with torch.no_grad(), torch.autocast(
-            device_type=mean.device.type, enabled=False
+        with (
+            torch.no_grad(),
+            torch.autocast(device_type=mean.device.type, enabled=False),
         ):
             rho = self.correlation
             next_state = rho * state + math.sqrt(1 - rho**2) * torch.randn_like(state)
@@ -250,18 +422,42 @@ class EigenDExplore(nn.Module):
             action = mean + iid + (eigen_sigma * next_state) @ self.basis
         return action, next_state
 
-    def _eigen_sigma(self, mean, iid_sigma, eigen_sigma):
+    def _eigen_sigma(self, mean, iid_sigma, eigen_sigma, group=None):
         if mean.ndim < 1 or mean.shape[-1] != self.basis.shape[1]:
             raise ValueError("mean width differs from basis action dimension")
-        if iid_sigma.shape != mean.shape and iid_sigma.shape != (mean.shape[-1],):
-            raise ValueError("iid_sigma must have mean shape or one value per action")
         if eigen_sigma is None:
             eigen_sigma = self.log_scale.exp()
-        if eigen_sigma.shape not in (
-            (self.basis.shape[0],),
-            (*mean.shape[:-1], self.basis.shape[0]),
-        ):
-            raise ValueError("eigen_sigma must match the mean batch and basis rank")
+        rank, width = self.basis.shape
+        if group is None:
+            if iid_sigma.shape not in (mean.shape, (width,)):
+                raise ValueError(
+                    "iid_sigma must have mean shape or one value per action"
+                )
+            if eigen_sigma.shape not in ((rank,), (*mean.shape[:-1], rank)):
+                raise ValueError("eigen_sigma must match the mean batch and basis rank")
+        else:
+            if group.shape != mean.shape[:-1] or group.dtype not in (
+                torch.int32,
+                torch.int64,
+            ):
+                raise ValueError("group must hold one integer row per mean")
+            if group.device != self.basis.device:
+                raise ValueError("group must be on the EigenDExplore device")
+            if eigen_sigma.ndim == 1:
+                eigen_sigma = eigen_sigma.unsqueeze(0)
+            rows = len(eigen_sigma) if iid_sigma.ndim == 1 else len(iid_sigma)
+            if iid_sigma.shape not in (
+                (width,),
+                (rows, width),
+            ) or eigen_sigma.shape not in (
+                (1, rank),
+                (rows, rank),
+            ):
+                raise ValueError(
+                    "with group, scales must be rows of shape (policies, action_dim)"
+                    " and (policies, rank)"
+                )
+            eigen_sigma = eigen_sigma.expand(rows, -1)
         for value in (mean, iid_sigma, eigen_sigma):
             if value.device != self.basis.device or value.dtype != self.basis.dtype:
                 raise ValueError("inputs must match EigenDExplore device and dtype")

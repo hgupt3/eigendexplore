@@ -63,7 +63,7 @@ Covariance uses the policy's action coordinates. If you computed it in physical 
 
 `spectrum_power` raises component **standard deviations** to that power (default 1). `eigen_rms` optionally sets initial average per-action RMS of the correlated contribution. These are construction operations. Move the module once with `.to(device=..., dtype=...)`; rollout inputs must already match. Float32 and float64 are supported. Construction rejects malformed, nonsymmetric, or indefinite covariance matrices and rank-deficient bases. A zero covariance has no Eigen direction and is rejected.
 
-You can instead supply `EigenDExplore(basis, eigen_sigma)` directly, with basis shape `(rank, action_dim)` and positive initial standard deviations shape `(rank,)`. Independent policies can supply `(policy_count, rank)` scales; select their rows explicitly through `distribution(mean, iid_sigma, eigen_sigma=selected_scales)`, matching the mean's batch dimensions. Directions need full row rank; they need not be orthonormal.
+You can instead supply `EigenDExplore(basis, eigen_sigma)` directly, with basis shape `(rank, action_dim)` and positive initial standard deviations shape `(rank,)`. Independent policies can supply `(policy_count, rank)` scales. Pass `distribution(mean, iid_sigma, group=policy_index)` with each mean's integer policy row; IID scales are then `(action_dim,)` or one row per policy. Each policy's covariance is factorized once, not once per sample. Per-sample scales matching the mean's batch dimensions also work. Directions need full row rank; they need not be orthonormal.
 
 ## Probability model
 
@@ -74,7 +74,7 @@ a = mu + iid_sigma * epsilon + B.T @ (exp(log_scale) * eta)
 Cov[a] = diag(iid_sigma**2) + B.T @ diag(exp(log_scale)**2) @ B
 ```
 
-The ordinary policy mean and IID noise remain. There is no Eigen mean head. PyTorch's low-rank multivariate Gaussian supplies sampling, exact action-space log probability, and entropy. The basis is a checkpointed buffer; `log_scale` is learnable. The policy can continue learning its IID scales independently.
+The ordinary policy mean and IID noise remain. There is no Eigen mean head. The returned `torch.distributions.Distribution` supplies sampling, exact action-space log probability, entropy, and KL. It applies the Woodbury identity and the matrix determinant lemma, so every solve has the basis rank, and it never synchronizes the GPU with the host. The basis is a checkpointed buffer; `log_scale` is learnable. The policy can continue learning its IID scales independently.
 
 ## Correlated Eigen noise
 
@@ -112,7 +112,7 @@ configure(
 )
 ```
 
-This registers a network and model through rl_games' public registry. The host still builds its own mean/value network. Here `iid_sigma` is an initial multiplier on the host's standard deviation, whose log-scale initializer should be zero for the stated initialization. The integration supports fixed and observation-conditioned IID scales. Its returned `sigmas` describe the IID component; training log probabilities and entropy include the correlated component.
+This registers a network and model through rl_games' public registry. The host still builds its own mean/value network. Here `iid_sigma` is an initial multiplier on the host's standard deviation, whose log-scale initializer should be zero for the stated initialization. The integration supports fixed and observation-conditioned IID scales, and SAPG's per-block scales (`fixed_sigma: coef_cond`), whose covariance it factorizes once per block. Its returned `sigmas` describe the IID component; training log probabilities and entropy include the correlated component.
 
 SimToolReal's special SAPG behavior is handled by its benchmark integration; it requires no extra adapter in a custom environment.
 

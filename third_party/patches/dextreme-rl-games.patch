@@ -1,5 +1,5 @@
 diff --git a/rl_games/algos_torch/a2c_continuous.py b/rl_games/algos_torch/a2c_continuous.py
-index dab36bfba89514fa7037b30137399f3995e863b0..4bbd6f80bce8a45665e393437d90faac3b9e2f70 100644
+index dab36bf..4bbd6f8 100755
 --- a/rl_games/algos_torch/a2c_continuous.py
 +++ b/rl_games/algos_torch/a2c_continuous.py
 @@ -176,6 +176,9 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
@@ -37,7 +37,7 @@ index dab36bfba89514fa7037b30137399f3995e863b0..4bbd6f80bce8a45665e393437d90faac
      def train_actor_critic(self, input_dict):
          self.set_train()
 diff --git a/rl_games/common/a2c_common.py b/rl_games/common/a2c_common.py
-index c37ba29b53e02bb7ac3d0b4743ebd6ae07fc4da8..d5cca7d54383fd9bbb4bb9a6cee10aa47ff0e799 100644
+index c37ba29..d5cca7d 100755
 --- a/rl_games/common/a2c_common.py
 +++ b/rl_games/common/a2c_common.py
 @@ -646,7 +646,15 @@ class A2CBase(BaseAlgorithm):
@@ -106,7 +106,7 @@ index c37ba29b53e02bb7ac3d0b4743ebd6ae07fc4da8..d5cca7d54383fd9bbb4bb9a6cee10aa4
          self.dataset.update_values_dict(dataset_dict)
  
 diff --git a/rl_games/common/datasets.py b/rl_games/common/datasets.py
-index 458fc466e3c5bfd502d367eee29b90ce9d042309..c0044f4e20a3ad181837a8e37fccfc0ae7e05057 100644
+index 458fc46..c0044f4 100755
 --- a/rl_games/common/datasets.py
 +++ b/rl_games/common/datasets.py
 @@ -30,7 +30,7 @@ class PPODataset(Dataset):
@@ -129,3 +129,99 @@ index 458fc466e3c5bfd502d367eee29b90ce9d042309..c0044f4e20a3ad181837a8e37fccfc0a
  
      def apply_permutation(self):
          """Permute the dataset indices if the permutation flag is enabled."""
+diff --git a/rl_games/common/player.py b/rl_games/common/player.py
+index d5c3a5b..2ce6460 100755
+--- a/rl_games/common/player.py
++++ b/rl_games/common/player.py
+@@ -296,6 +296,10 @@ class BasePlayer(object):
+         self.wait_for_checkpoint()
+ 
+         need_init_rnn = self.is_rnn
++        # Count only each environment's first episode, so short episodes cannot outnumber
++        # long ones, and stop once every environment has finished one.
++        one_episode = self.player_config.get('one_episode_per_env', False)
++        success_key = self.player_config.get('success_key')  # dotted path into the step info
+         for _ in range(n_games):
+             if games_played >= n_games:
+                 break
+@@ -310,6 +314,9 @@ class BasePlayer(object):
+ 
+             cr = torch.zeros(batch_size, dtype=torch.float32)
+             steps = torch.zeros(batch_size, dtype=torch.float32)
++            if one_episode:
++                finished = torch.zeros(batch_size, dtype=torch.bool)
++                episode_stats = torch.zeros(3, batch_size)  # reward, steps, successes
+ 
+             # Initialize per-environment accumulators if balance_env_rewards is enabled
+             if self.balance_env_rewards:
+@@ -348,6 +355,21 @@ class BasePlayer(object):
+                         for s in self.states:
+                             s[:, all_done_indices, :] = s[:,
+                                                         all_done_indices, :] * 0.0
++                    if one_episode:
++                        first = done.bool() & ~finished
++                        episode_stats[0, first] = cr[first]
++                        episode_stats[1, first] = steps[first]
++                        if success_key is not None:
++                            value = info
++                            for part in success_key.split('.'):
++                                value = value[part]
++                            episode_stats[2, first] = value.float().cpu()[first]
++                        finished |= first
++                        cr = cr * (1.0 - done.float())
++                        steps = steps * (1.0 - done.float())
++                        if finished.all():
++                            break
++                        continue
+                     game_res = 0.0
+                     if isinstance(info, dict):
+                         if 'battle_won' in info:
+@@ -391,6 +413,19 @@ class BasePlayer(object):
+ 
+                     if batch_size // self.num_agents == 1 or games_played >= n_games:
+                         break
++            if one_episode:
++                break
++
++        if one_episode:
++            count = int(finished.sum())
++            print(f'episodes: {count} of {batch_size} environments')
++            if count:
++                reward, length, successes = episode_stats[:, finished].mean(dim=1).tolist()
++                print(f'mean reward: {reward:.2f}')
++                print(f'mean steps: {length:.1f}')
++                if success_key is not None:
++                    print(f'mean successes: {successes:.2f}')
++            return
+ 
+         if self.balance_env_rewards:
+             # Calculate per-environment average rewards
+diff --git a/rl_games/torch_runner.py b/rl_games/torch_runner.py
+index 456ce02..6b35bf9 100755
+--- a/rl_games/torch_runner.py
++++ b/rl_games/torch_runner.py
+@@ -13,6 +13,7 @@ from rl_games.common import tr_helpers
+ from rl_games.algos_torch import a2c_continuous
+ from rl_games.algos_torch import a2c_discrete
+ from rl_games.algos_torch import players
++from rl_games.algos_torch import torch_ext
+ from rl_games.common.algo_observer import DefaultAlgoObserver
+ from rl_games.algos_torch import sac_agent
+ 
+@@ -27,6 +28,16 @@ def _restore(agent, args):
+                 raise ValueError('Loading critic only works only for asymmetric actor critic')
+             agent.restore_central_value_function(args['checkpoint'])
+             return
++        mode = args.get('checkpoint_load_mode', 'resume')
++        if mode not in ('resume', 'weights'):
++            raise ValueError(f"checkpoint_load_mode must be resume or weights, got {mode!r}")
++        if args['train'] and mode == 'weights':
++            # Policy, critic and normalizers only; optimizer, counters and curricula start fresh.
++            weights = torch_ext.load_checkpoint(args['checkpoint'])
++            agent.set_weights(weights)
++            if getattr(agent, 'has_central_value', False):
++                agent.central_value_net.load_state_dict(weights['assymetric_vf_nets'])
++            return
+         agent.restore(args['checkpoint'])
+ 
+ def _override_sigma(agent, args):

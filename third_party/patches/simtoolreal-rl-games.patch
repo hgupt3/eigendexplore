@@ -1,7 +1,46 @@
+diff --git a/rl_games/rl_games/algos_torch/a2c_continuous.py b/rl_games/rl_games/algos_torch/a2c_continuous.py
+index 63af1edd..d40800a5 100644
+--- a/rl_games/rl_games/algos_torch/a2c_continuous.py
++++ b/rl_games/rl_games/algos_torch/a2c_continuous.py
+@@ -131,6 +131,9 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+             entropy = res_dict['entropy']
+             mu = res_dict['mus']
+             sigma = res_dict['sigmas']
++            eigen_sigma = res_dict.get('eigen_sigmas')
++            if eigen_sigma is not None:
++                eigen_sigma = eigen_sigma.detach()
+ 
+             a_loss = self.actor_loss_func(old_action_log_probs_batch, action_log_probs, advantage, self.ppo, curr_e_clip)
+ 
+@@ -179,7 +182,13 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+ 
+         with torch.no_grad():
+             reduce_kl = rnn_masks is None
+-            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
++            if eigen_sigma is not None:
++                kl_dist = self.model.a2c_network.eigendexplore.policy_kl(
++                    mu.detach(), sigma.detach(), eigen_sigma,
++                    old_mu_batch, old_sigma_batch, input_dict['eigen_sigma'],
++                    reduce_kl)
++            else:
++                kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
+             if rnn_masks is not None:
+                 kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
+ 
+@@ -220,7 +229,7 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
+             extras["entropies"] = [torch.nan_to_num(entropy[bl_idxs == i].detach().mean()).item() for i in range(self.num_actors // self.intr_coef_block_size)]
+         self.train_result = (a_loss, c_loss, torch_ext.apply_masks([entropy.unsqueeze(1)], rnn_masks)[0][0], \
+             kl_dist, self.last_lr, lr_mul, \
+-            mu.detach(), sigma.detach(), b_loss, extras)
++            mu.detach(), sigma.detach(), eigen_sigma, b_loss, extras)
+ 
+     def train_actor_critic(self, input_dict):
+         self.calc_gradients(input_dict)
 diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a2c_common.py
+index d3e77823..df04b0d0 100644
 --- a/rl_games/rl_games/common/a2c_common.py
 +++ b/rl_games/rl_games/common/a2c_common.py
-@@ -722,6 +722,7 @@
+@@ -722,6 +722,7 @@ class A2CBase(BaseAlgorithm):
              self.central_value_net.load_state_dict(weights['assymetric_vf_nets'])
  
          self.optimizer.load_state_dict(weights['optimizer'])
@@ -9,7 +48,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
          self.last_lr = weights['optimizer']['param_groups'][0]['lr']
  
          self.last_mean_rewards = weights.get('last_mean_rewards', -1000000000)
-@@ -1030,6 +1031,9 @@
+@@ -1030,6 +1031,9 @@ class A2CBase(BaseAlgorithm):
              
              mb_obs[:,:, -self.intr_reward_coef_embd.shape[-1]:] = torch.roll(self.intr_reward_coef_embd, self.intr_coef_block_size*r_k, dims=0)
              last_obs_and_states['obs'][:,-self.intr_reward_coef_embd.shape[-1]:] = torch.roll(self.intr_reward_coef_embd, self.intr_coef_block_size*r_k, dims=0)
@@ -19,7 +58,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
              
              flattened_rnn_states = [rnn_s.transpose(0, 1).reshape(rnn_s.transpose(0, 1).shape[0], -1, *rnn_s.shape[3:]) for rnn_s in mb_rnn_states] if mb_rnn_states is not None else None
  
-@@ -1066,6 +1070,9 @@
+@@ -1066,6 +1070,9 @@ class A2CBase(BaseAlgorithm):
          # reset obs and last obs in extras
          extras['obs'][:,:, -self.intr_reward_coef_embd.shape[-1]:] = self.intr_reward_coef_embd
          extras['last_obs']['obs'][:,-self.intr_reward_coef_embd.shape[-1]:] = self.intr_reward_coef_embd
@@ -29,7 +68,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
  
          return new_batch_dict
  
-@@ -1365,6 +1372,12 @@
+@@ -1365,6 +1372,12 @@ class ContinuousA2CBase(A2CBase):
      def init_tensors(self):
          A2CBase.init_tensors(self)
          self.update_list = ['actions', 'neglogpacs', 'values', 'mus', 'sigmas']
@@ -42,7 +81,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
          self.tensor_list = self.update_list + ['obses', 'states', 'dones']
  
      def train_epoch(self):
-@@ -1416,7 +1429,7 @@
+@@ -1416,7 +1429,7 @@ class ContinuousA2CBase(A2CBase):
          for mini_ep in range(0, self.mini_epochs_num):
              ep_kls = []
              for i in range(len(self.dataset)):
@@ -51,7 +90,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
                  extra_infos['on_policy_contrib'].append(extras['on_policy_contrib'])
                  extra_infos['on_policy_grads'].append(extras['on_policy_grads'])
                  extra_infos['off_policy_contrib'].append(extras['off_policy_contrib'])
-@@ -1430,7 +1443,7 @@
+@@ -1430,7 +1443,7 @@ class ContinuousA2CBase(A2CBase):
                  if self.bounds_loss_coef is not None:
                      b_losses.append(b_loss)
  
@@ -60,7 +99,7 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
                  if self.schedule_type == 'legacy':
                      av_kls = kl
                      if self.multi_gpu:
-@@ -1516,6 +1529,8 @@
+@@ -1516,6 +1529,8 @@ class ContinuousA2CBase(A2CBase):
          dataset_dict['rnn_masks'] = rnn_masks
          dataset_dict['mu'] = mus
          dataset_dict['sigma'] = sigmas
@@ -70,9 +109,10 @@ diff --git a/rl_games/rl_games/common/a2c_common.py b/rl_games/rl_games/common/a
  
          self.dataset.update_values_dict(dataset_dict)
 diff --git a/rl_games/rl_games/common/datasets.py b/rl_games/rl_games/common/datasets.py
+index 025f199e..b94797c7 100644
 --- a/rl_games/rl_games/common/datasets.py
 +++ b/rl_games/rl_games/common/datasets.py
-@@ -27,11 +27,15 @@
+@@ -27,11 +27,15 @@ class PPODataset(Dataset):
          if values_dict is not None and 'returns' in values_dict:
              self.length =  len(values_dict['returns']) // self.minibatch_size    
  
@@ -89,40 +129,142 @@ diff --git a/rl_games/rl_games/common/datasets.py b/rl_games/rl_games/common/dat
  
      def __len__(self):
          return self.length
-diff --git a/rl_games/rl_games/algos_torch/a2c_continuous.py b/rl_games/rl_games/algos_torch/a2c_continuous.py
---- a/rl_games/rl_games/algos_torch/a2c_continuous.py
-+++ b/rl_games/rl_games/algos_torch/a2c_continuous.py
-@@ -131,6 +131,9 @@
-             entropy = res_dict['entropy']
-             mu = res_dict['mus']
-             sigma = res_dict['sigmas']
-+            eigen_sigma = res_dict.get('eigen_sigmas')
-+            if eigen_sigma is not None:
-+                eigen_sigma = eigen_sigma.detach()
+diff --git a/rl_games/rl_games/common/player.py b/rl_games/rl_games/common/player.py
+index 83162989..24c39d42 100644
+--- a/rl_games/rl_games/common/player.py
++++ b/rl_games/rl_games/common/player.py
+@@ -320,6 +320,11 @@ class BasePlayer(object):
+         self.wait_for_checkpoint()
  
-             a_loss = self.actor_loss_func(old_action_log_probs_batch, action_log_probs, advantage, self.ppo, curr_e_clip)
+         need_init_rnn = self.is_rnn
++        save_obs = self.player_config.get('save_obs', False)
++        # Count only each environment's first episode, so short episodes cannot outnumber
++        # long ones, and stop once every environment has finished one.
++        one_episode = self.player_config.get('one_episode_per_env', False)
++        success_key = self.player_config.get('success_key')  # dotted path into the step info
+         obs_buffer = []
+         for _ in range(n_games):
+             if games_played >= n_games:
+@@ -338,13 +343,17 @@ class BasePlayer(object):
  
-@@ -179,7 +182,13 @@
+             cr = torch.zeros(batch_size, dtype=torch.float32)
+             steps = torch.zeros(batch_size, dtype=torch.float32)
++            if one_episode:
++                finished = torch.zeros(batch_size, dtype=torch.bool)
++                episode_stats = torch.zeros(3, batch_size)  # reward, steps, successes
  
-         with torch.no_grad():
-             reduce_kl = rnn_masks is None
--            kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
-+            if eigen_sigma is not None:
-+                kl_dist = self.model.a2c_network.eigendexplore.policy_kl(
-+                    mu.detach(), sigma.detach(), eigen_sigma,
-+                    old_mu_batch, old_sigma_batch, input_dict['eigen_sigma'],
-+                    reduce_kl)
-+            else:
-+                kl_dist = torch_ext.policy_kl(mu.detach(), sigma.detach(), old_mu_batch, old_sigma_batch, reduce_kl)
-             if rnn_masks is not None:
-                 kl_dist = (kl_dist * rnn_masks).sum() / rnn_masks.numel()  #/ sum_mask
+             print_game_res = False
  
-@@ -220,7 +229,7 @@
-             extras["entropies"] = [torch.nan_to_num(entropy[bl_idxs == i].detach().mean()).item() for i in range(self.num_actors // self.intr_coef_block_size)]
-         self.train_result = (a_loss, c_loss, torch_ext.apply_masks([entropy.unsqueeze(1)], rnn_masks)[0][0], \
-             kl_dist, self.last_lr, lr_mul, \
--            mu.detach(), sigma.detach(), b_loss, extras)
-+            mu.detach(), sigma.detach(), eigen_sigma, b_loss, extras)
+             for n in range(self.max_steps):
+                 if n % 500 == 0:
+                     print(f"Step {n} of {self.max_steps}")
+-                obs_buffer.append(obses)
++                if save_obs:
++                    obs_buffer.append(obses)
+                 if self.evaluation and n % self.update_checkpoint_freq == 0:
+                     self.maybe_load_new_checkpoint()
  
-     def train_actor_critic(self, input_dict):
-         self.calc_gradients(input_dict)
+@@ -389,6 +398,22 @@ class BasePlayer(object):
+                             s[:, all_done_indices, :] = s[:,
+                                                           all_done_indices, :] * 0.0
+ 
++                    if one_episode:
++                        first = done.bool() & ~finished
++                        episode_stats[0, first] = cr[first]
++                        episode_stats[1, first] = steps[first]
++                        if success_key is not None:
++                            value = info
++                            for part in success_key.split('.'):
++                                value = value[part]
++                            episode_stats[2, first] = value.float().cpu()[first]
++                        finished |= first
++                        cr = cr * (1.0 - done.float())
++                        steps = steps * (1.0 - done.float())
++                        if finished.all():
++                            break
++                        continue
++
+                     rewards_tracker[done_indices] += cr[done_indices]
+                     episode_length_tracker[done_indices] += steps[done_indices]
+                     episode_tracker[done_indices] += 1
+@@ -419,24 +444,37 @@ class BasePlayer(object):
+                     sum_game_res += game_res
+                     if batch_size//self.num_agents == 1 or games_played >= n_games:
+                         break
+-            obs_buffer.append(obses)
+-        
+-        obs_buffer = torch.stack(obs_buffer)
+-        if self.intr_reward_coef_embd is not None:
+-            assert len(obs_buffer.shape) == 3
+-            obs_buffer = obs_buffer[:,:,:-self.intr_reward_coef_embd.shape[1]]
+-        
+-        pickle.dump(rigid_body_state_tracker, open(f'{self.loaded_checkpoint}.rigid_body_state.pkl', 'wb'))
+-        
+-        if self.player_config.get('save_obs', False):
++            if save_obs:
++                obs_buffer.append(obses)
++            if one_episode:
++                break
++
++        if save_obs:
++            obs_buffer = torch.stack(obs_buffer)
++            if self.intr_reward_coef_embd is not None:
++                assert len(obs_buffer.shape) == 3
++                obs_buffer = obs_buffer[:,:,:-self.intr_reward_coef_embd.shape[1]]
+             with open(f'{self.loaded_checkpoint}.obs.pkl', 'wb') as f:
+                 pickle.dump(obs_buffer.detach().cpu().numpy(), f)
+ 
+-        print(f'reward: {(rewards_tracker/episode_tracker).numpy()}')
+-        print(f'steps: {(episode_length_tracker/episode_tracker).numpy()}')
+-        if 'successes' in info:
+-            print(f'successes: {(success_tracker/episode_tracker).numpy()}')
+-        print(f'num_episodes: {episode_tracker.numpy()}')
++        if one_episode:
++            count = int(finished.sum())
++            print(f'episodes: {count} of {batch_size} environments')
++            if count:
++                reward, length, successes = episode_stats[:, finished].mean(dim=1).tolist()
++                print(f'mean reward: {reward:.2f}')
++                print(f'mean steps: {length:.1f}')
++                if success_key is not None:
++                    print(f'mean successes: {successes:.2f}')
++            return
++
++        episodes = episode_tracker.sum().item()
++        print(f'episodes: {episodes:.0f}')
++        if episodes:
++            print(f'mean reward: {rewards_tracker.sum().item() / episodes:.2f}')
++            print(f'mean steps: {episode_length_tracker.sum().item() / episodes:.1f}')
++            if 'successes' in info:
++                print(f'mean successes: {success_tracker.sum().item() / episodes:.2f}')
+ 
+     
+     def update_checkpoint(self, idx):
+diff --git a/rl_games/rl_games/torch_runner.py b/rl_games/rl_games/torch_runner.py
+index bd4d6093..7590f27e 100644
+--- a/rl_games/rl_games/torch_runner.py
++++ b/rl_games/rl_games/torch_runner.py
+@@ -11,12 +11,23 @@ from rl_games.common import tr_helpers
+ from rl_games.algos_torch import a2c_continuous
+ from rl_games.algos_torch import a2c_discrete
+ from rl_games.algos_torch import players
++from rl_games.algos_torch import torch_ext
+ from rl_games.common.algo_observer import DefaultAlgoObserver
+ from rl_games.algos_torch import sac_agent
+ 
+ 
+ def _restore(agent, args):
+     if 'checkpoint' in args and args['checkpoint'] is not None and args['checkpoint'] !='':
++        mode = args.get('checkpoint_load_mode', 'resume')
++        if mode not in ('resume', 'weights'):
++            raise ValueError(f"checkpoint_load_mode must be resume or weights, got {mode!r}")
++        if args['train'] and mode == 'weights':
++            # Policy, critic and normalizers only; optimizer, counters and curricula start fresh.
++            weights = torch_ext.load_checkpoint(args['checkpoint'])
++            agent.set_weights(weights)
++            if getattr(agent, 'has_central_value', False):
++                agent.central_value_net.load_state_dict(weights['assymetric_vf_nets'])
++            return
+         agent.restore(args['checkpoint'])
+ 
+ def _override_sigma(agent, args):

@@ -31,6 +31,8 @@ action-bench run study.yaml --installation "$AB_WORK/simtoolreal/installation.js
 
 Use any [method](../README.md#methods) in place of `eigendexplore`. The native success-tolerance curriculum is active from the start: it begins at 7.5 cm and tightens toward 1 cm / 8° as the policy improves. Training output goes to the terminal and `train.log` in the output directory. Set `WANDB_MODE=offline` to log without a W&B account.
 
+`action-bench play study.yaml --installation ... --checkpoint PATH --output DIR` runs a trained policy's mean action for one episode in each of 1024 environments (`--num-envs`), at the final 1 cm tolerance. It prints the mean consecutive successes, reward and steps to the terminal and `play.log`; `--record` adds a video.
+
 | Option | Effect |
 | --- | --- |
 | `--seed N` | Trial seed (default 101) |
@@ -39,3 +41,4 @@ Use any [method](../README.md#methods) in place of `eigendexplore`. The native s
 | `--prepare-only` | Write the resolved command without training |
 | `--record` | Save videos ([README](../README.md#videos)) |
 | `--checkpoint PATH` | Continue a previous run of the same study and seed into a new output directory |
+| `--init-weights PATH` | Start a new run from a policy's weights, e.g. a [pretrained policy](../README.md#pretrained-policies) |

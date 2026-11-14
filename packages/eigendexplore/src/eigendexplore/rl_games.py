@@ -38,9 +38,6 @@ class EigenDExploreNetworkBuilder(network_builder.A2CBuilder):
             raise ValueError(
                 "iid_sigma must be finite, positive, and match action width"
             )
-        net.eigendexplore_batch_constant_sigma = (
-            isinstance(net.sigma, torch.nn.Parameter) and net.sigma.ndim == 1
-        )
         net.register_buffer("eigendexplore_iid_multiplier", iid)
         return net
 
@@ -54,22 +51,16 @@ class EigenDExploreModel(models.ModelA2CContinuousLogStd):
             # AMP accelerates the policy network; covariance solves and probabilities
             # retain the module's dtype, with gradients through the explicit casts.
             with torch.autocast(device_type=mean.device.type, enabled=False):
-                dtype = self.a2c_network.eigendexplore.basis.dtype
-                mean = mean.to(dtype=dtype)
-                logstd = logstd.to(dtype=dtype)
-                # Fixed-sigma hosts share one factorization across the rollout batch.
-                shared_logstd = (
-                    logstd[0]
-                    if self.a2c_network.eigendexplore_batch_constant_sigma
-                    else logstd
-                )
-                sigma = (
-                    shared_logstd.exp() * self.a2c_network.eigendexplore_iid_multiplier
-                )
                 net = self.a2c_network
-                eigen_sigma = net.eigendexplore.log_scale.exp()
-                if eigen_sigma.ndim == 2:
-                    ids = (
+                noise = net.eigendexplore
+                dtype = noise.basis.dtype
+                mean = mean.to(dtype=dtype)
+                group = None
+                if noise.log_scale.ndim == 2:
+                    # SAPG blocks: rows of the host's sigma and of log_scale hold each
+                    # block's scales (identity sigma activation); each row is
+                    # factorized once instead of once per sample.
+                    group = (
                         (
                             inputs["obs"][:, net.sigma_id_idx].unsqueeze(-1)
                             == net.sigma_ids
@@ -77,15 +68,17 @@ class EigenDExploreModel(models.ModelA2CContinuousLogStd):
                         .float()
                         .argmax(dim=-1)
                     )
-                    eigen_sigma = eigen_sigma[ids]
-                distribution = net.eigendexplore.distribution(
-                    mean, sigma, eigen_sigma=eigen_sigma
-                )
+                    logstd = net.sigma
+                elif isinstance(net.sigma, torch.nn.Parameter):
+                    # A fixed sigma: one factorization for the whole batch.
+                    logstd = net.sigma
+                sigma = logstd.to(dtype=dtype).exp() * net.eigendexplore_iid_multiplier
+                distribution = noise.distribution(mean, sigma, group=group)
                 result = {
                     "mus": mean,
-                    "sigmas": sigma.expand_as(mean),
-                    "eigen_sigmas": eigen_sigma.expand(
-                        *mean.shape[:-1], net.eigendexplore.basis.shape[0]
+                    "sigmas": distribution.iid_sigma.expand_as(mean),
+                    "eigen_sigmas": distribution.eigen_sigma.expand(
+                        *mean.shape[:-1], noise.basis.shape[0]
                     ),
                     "rnn_states": states,
                 }

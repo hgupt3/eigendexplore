@@ -1,4 +1,4 @@
-"""Small public CLI: list bases, resolve a method, and prepare or run a benchmark."""
+"""Small public CLI: list bases, resolve a method, and prepare, run or play a benchmark."""
 
 import argparse
 import json
@@ -37,7 +37,14 @@ def main(argv=None):
     run.add_argument("--num-envs", type=int)
     run.add_argument("--max-epochs", type=int)
     run.add_argument("--gpu", default="0")
-    run.add_argument("--checkpoint", type=Path)
+    run.add_argument(
+        "--checkpoint", type=Path, help="Continue a recorded run of the same study"
+    )
+    run.add_argument(
+        "--init-weights",
+        type=Path,
+        help="Start from a policy's weights (e.g. a released one); training state starts fresh",
+    )
     run.add_argument("--prepare-only", action="store_true")
     run.add_argument(
         "--record",
@@ -48,6 +55,23 @@ def main(argv=None):
         "--record-every-epochs",
         type=int,
         help="With --record, override the benchmark capture cadence",
+    )
+    play = commands.add_parser(
+        "play",
+        help="Run a trained policy's mean action for one episode per environment and report the means",
+    )
+    play.add_argument("study", type=Path)
+    play.add_argument("--installation", required=True, type=Path)
+    play.add_argument("--checkpoint", required=True, type=Path)
+    play.add_argument("--output", required=True, type=Path)
+    play.add_argument("--seed", type=int, default=101, help="Environment seed")
+    play.add_argument("--num-envs", type=int, help="Environments, one episode each")
+    play.add_argument("--gpu", default="0")
+    play.add_argument("--prepare-only", action="store_true")
+    play.add_argument(
+        "--record",
+        action="store_true",
+        help="Save a 30-second state capture from the start and render it to MP4",
     )
     render = commands.add_parser(
         "render", help="Render a saved state capture to MP4 on CPU"
@@ -97,7 +121,7 @@ def main(argv=None):
     else:
         from .launch import execute_run, prepare_run
 
-        plan = prepare_run(load_study(args.study), args)
+        plan = prepare_run(load_study(args.study), args, play=args.command == "play")
         print(json.dumps(plan, indent=2))
         if not args.prepare_only:
             execute_run(plan)

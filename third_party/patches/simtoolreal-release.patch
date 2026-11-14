@@ -205,23 +205,10 @@ index 4960d133..039ee8cc 100644
          eligible_mask = None
          if hasattr(env, "_curriculum_eligible_mask"):
 diff --git a/isaacsimenvs/train.py b/isaacsimenvs/train.py
-index 0eca1a1c..b0419f3f 100644
+index 0eca1a1c..9adc21f7 100644
 --- a/isaacsimenvs/train.py
 +++ b/isaacsimenvs/train.py
-@@ -49,12 +49,6 @@ def main() -> None:
-     # --- Runtime toggles ---
-     parser.add_argument("--test", action="store_true", help="Run inference (player) instead of training")
-     parser.add_argument("--checkpoint", default=None, help="Path to .pth to restore")
--    parser.add_argument(
--        "--checkpoint_load_mode",
--        choices=("resume", "weights"),
--        default="resume",
--        help="resume restores optimizer/rollout/env state; weights starts fresh from model weights.",
--    )
-     parser.add_argument("--rl_device", default="cuda:0")
-     parser.add_argument("--sim_device", default="cuda:0")
-     # --- Video ---
-@@ -135,12 +129,22 @@ def main() -> None:
+@@ -135,12 +135,22 @@ def main() -> None:
          # (~400 GB at 24576 envs) and OOM'd the slurm cgroup. The Lab-
          # canonical pattern is render_mode + gym.wrappers.RecordVideo (see
          # IsaacLab tests/test_record_video.py).
@@ -244,7 +231,7 @@ index 0eca1a1c..b0419f3f 100644
          if args_cli.capture_video:
              from pathlib import Path
  
-@@ -174,6 +178,15 @@ def main() -> None:
+@@ -174,6 +184,17 @@ def main() -> None:
          # matches isaacgymenvs's `cfg["env"].get("clipObservations", np.Inf)`.
          clip_obs = float(agent_cfg["params"]["env"].get("clip_observations", math.inf))
          clip_actions = float(agent_cfg["params"]["env"].get("clip_actions", math.inf))
@@ -257,10 +244,12 @@ index 0eca1a1c..b0419f3f 100644
 +            env, capture_observer, capture = configure_recording(
 +                env, EnvStatsAlgoObserver(), record_dir, Path(__file__).resolve().parents[1]
 +            )
++            if args_cli.test:
++                capture.arm(0, 0)
          register_rlgames_env(
              env,
              rl_device=args_cli.rl_device,
-@@ -181,7 +194,7 @@ def main() -> None:
+@@ -181,7 +202,7 @@ def main() -> None:
              clip_actions=clip_actions,
          )
  
@@ -269,7 +258,7 @@ index 0eca1a1c..b0419f3f 100644
          if args_cli.wandb_activate:
              from isaacsimenvs.utils.wandb_utils import WandbAlgoObserver
  
-@@ -211,14 +224,17 @@ def main() -> None:
+@@ -211,14 +232,22 @@ def main() -> None:
  
          runner.load(agent_cfg)
          runner.reset()
@@ -281,14 +270,19 @@ index 0eca1a1c..b0419f3f 100644
 -                "checkpoint_load_mode": args_cli.checkpoint_load_mode,
 -            }
 -        )
++        import torch
++
 +        try:
-+            runner.run(
-+                {
-+                    "train": not args_cli.test,
-+                    "play": args_cli.test,
-+                    "checkpoint": args_cli.checkpoint,
-+                }
-+            )
++            # Training rollouts already run without autograd; playing matches them.
++            with torch.set_grad_enabled(not args_cli.test):
++                runner.run(
++                    {
++                        "train": not args_cli.test,
++                        "play": args_cli.test,
++                        "checkpoint": args_cli.checkpoint,
++                        "checkpoint_load_mode": args_cli.checkpoint_load_mode,
++                    }
++                )
 +        finally:
 +            if capture is not None:
 +                capture.close()
