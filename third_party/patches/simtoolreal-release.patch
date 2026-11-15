@@ -1,68 +1,339 @@
+diff --git a/assets/urdf/kuka_sharpa_description/iiwa14_left_sharpa_adjusted_restricted.urdf b/assets/urdf/kuka_sharpa_description/iiwa14_left_sharpa_adjusted_restricted.urdf
+index bdf1cc9d3b98ae105386dcde9972ec37c887038e..b08f8b6552d044b960c027eb0f997356992b9ea8 100644
+--- a/assets/urdf/kuka_sharpa_description/iiwa14_left_sharpa_adjusted_restricted.urdf
++++ b/assets/urdf/kuka_sharpa_description/iiwa14_left_sharpa_adjusted_restricted.urdf
+@@ -368,7 +368,7 @@
+     <child link="left_thumb_MC"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="3.3" velocity="11.84076833" /> -->
+-    <limit lower="-0.3491" upper="0.1309" effort="3.3" velocity="11.84076833"/>
++    <limit lower="-0.3491" upper="0.3491" effort="3.3" velocity="11.84076833"/>
+   </joint>
+   <link name="left_thumb_MCP_VL">
+     <inertial>
+@@ -549,7 +549,7 @@
+     <child link="left_index_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_index_MP">
+     <inertial>
+@@ -707,7 +707,7 @@
+     <child link="left_middle_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_middle_MP">
+     <inertial>
+@@ -865,7 +865,7 @@
+     <child link="left_ring_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_ring_MP">
+     <inertial>
+@@ -1052,7 +1052,7 @@
+     <child link="left_pinky_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_pinky_MP">
+     <inertial>
+diff --git a/assets/urdf/left_sharpa_ha4/left_sharpa_ha4_v2_1_adjusted_restricted.urdf b/assets/urdf/left_sharpa_ha4/left_sharpa_ha4_v2_1_adjusted_restricted.urdf
+index 001231b22cfe8bf3a19a9ff85a67edfc404df6d2..a08a6cedfc282c72c2b7e1bd73418dc0f30d8850 100644
+--- a/assets/urdf/left_sharpa_ha4/left_sharpa_ha4_v2_1_adjusted_restricted.urdf
++++ b/assets/urdf/left_sharpa_ha4/left_sharpa_ha4_v2_1_adjusted_restricted.urdf
+@@ -77,7 +77,7 @@
+     <child link="left_thumb_MC"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="3.3" velocity="11.84076833" /> -->
+-    <limit lower="-0.3491" upper="0.1309" effort="3.3" velocity="11.84076833"/>
++    <limit lower="-0.3491" upper="0.3491" effort="3.3" velocity="11.84076833"/>
+   </joint>
+   <link name="left_thumb_MCP_VL">
+     <inertial>
+@@ -258,7 +258,7 @@
+     <child link="left_index_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_index_MP">
+     <inertial>
+@@ -416,7 +416,7 @@
+     <child link="left_middle_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_middle_MP">
+     <inertial>
+@@ -574,7 +574,7 @@
+     <child link="left_ring_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_ring_MP">
+     <inertial>
+@@ -761,7 +761,7 @@
+     <child link="left_pinky_PP"/>
+     <axis xyz="0 0 1"/>
+     <!-- <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878" /> -->
+-    <limit lower="-0.03491" upper="0.03491" effort="1.864" velocity="16.07692878"/>
++    <limit lower="-0.3491" upper="0.3491" effort="1.864" velocity="16.07692878"/>
+   </joint>
+   <link name="left_pinky_MP">
+     <inertial>
+diff --git a/isaacgymenvs/cfg/train/SimToolRealPPO.yaml b/isaacgymenvs/cfg/train/SimToolRealPPO.yaml
+index dbb762aa04e2987d78545076e03e89957ab8ad0b..791382b9a124572cec5487e918ae6f0bc5609814 100644
+--- a/isaacgymenvs/cfg/train/SimToolRealPPO.yaml
++++ b/isaacgymenvs/cfg/train/SimToolRealPPO.yaml
+@@ -59,7 +59,6 @@ params:
+     max_epochs: 1000000
+     max_frames: 100_000_000_000_000
+     save_best_after: 100
+-    save_frequency: 3000
+     print_stats: True
+     grad_norm: 1.0
+     entropy_coef: 0.0
+diff --git a/isaacsimenvs/cfg/task/SimToolReal.yaml b/isaacsimenvs/cfg/task/SimToolReal.yaml
+index 6469d46867081b70edaa589dcb31c7090b64d45e..d0ff6b8a5d6b3522cdbda466c1e0c12f603f812b 100644
+--- a/isaacsimenvs/cfg/task/SimToolReal.yaml
++++ b/isaacsimenvs/cfg/task/SimToolReal.yaml
+@@ -3,7 +3,7 @@
+ # -----------------------------------------------------------------------------
+ decimation: 2
+ episode_length_s: 10.0
+-action_space: 29
++# action_space is derived as 7 + action.hand_action_dim by SimToolRealEnv.
+ # observation_space / state_space are computed in SimToolRealEnv.__init__ from
+ # obs.obs_list / obs.state_list (see Phase D). Configclass defaults (140/140)
+ # act only as transient placeholders before __init__ overwrites them.
+@@ -64,10 +64,12 @@ obs:
+   state_list: [joint_pos, joint_vel, prev_action_targets, palm_pos, palm_rot, palm_vel,
+                object_rot, object_vel, fingertip_pos_rel_palm, keypoints_rel_palm,
+                keypoints_rel_goal, object_scales, closest_keypoint_max_dist,
+-               closest_fingertip_dist, lifted_object, progress, successes, reward]
++               closest_fingertip_dist, lifted_object, progress, successes, reward,
++               latent_state]
+   obs_list: [joint_pos, joint_vel, prev_action_targets, palm_pos, palm_rot,
+              object_rot, fingertip_pos_rel_palm, keypoints_rel_palm,
+-             keypoints_rel_goal, object_scales]
++             keypoints_rel_goal, object_scales, latent_state]
++  num_latent_obs: 0
+   clamp_abs_observations: 10.0
+ 
+ # -----------------------------------------------------------------------------
+@@ -77,6 +79,7 @@ action:
+   arm_moving_average: 0.1
+   hand_moving_average: 0.1
+   dof_speed_scale: 1.5
++  hand_action_dim: 22
+ 
+ # -----------------------------------------------------------------------------
+ # 5) reward — keypoint + lifting + distance-delta + reach-goal + action penalties
+diff --git a/isaacsimenvs/cfg/train/SimToolRealPPO.yaml b/isaacsimenvs/cfg/train/SimToolRealPPO.yaml
+index 8ab56413e5e061da3a780430d0c013950e9e22bc..c967cfe0522cc912bd2a610d83a507b77228102a 100644
+--- a/isaacsimenvs/cfg/train/SimToolRealPPO.yaml
++++ b/isaacsimenvs/cfg/train/SimToolRealPPO.yaml
+@@ -84,7 +84,6 @@ params:
+     score_to_win: 1000000
+     max_epochs: 1000000
+     save_best_after: 100
+-    save_frequency: 3000
+     print_stats: True
+     grad_norm: 1.0
+     entropy_coef: 0.0
+diff --git a/isaacsimenvs/cfg/train/SimToolRealSAPG.yaml b/isaacsimenvs/cfg/train/SimToolRealSAPG.yaml
+index f363d05d4a24b190b7837703b93270d8f3fe9a9c..c5494f6294c1fd66c14d9eea9e4d76663e68873e 100644
+--- a/isaacsimenvs/cfg/train/SimToolRealSAPG.yaml
++++ b/isaacsimenvs/cfg/train/SimToolRealSAPG.yaml
+@@ -85,7 +85,6 @@ params:
+     score_to_win: 1000000
+     max_epochs: 1000000
+     save_best_after: 100
+-    save_frequency: 3000
+     print_stats: True
+     grad_norm: 1.0
+     entropy_coef: 0.0
 diff --git a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
-index 0278ebe4..a795c314 100644
+index 42c03361249fffde36c9f212b118c416f394cf53..a795c31492f0a258de9fc957c746f36ae15d90ba 100644
 --- a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
 +++ b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env.py
-@@ -48,31 +48,11 @@ class SimToolRealEnv(DirectRLEnv):
-             )
-         elif not callable(cfg.action.hand_action_transform):
-             raise TypeError("action.hand_action_transform must be callable or None")
--        if cfg.action.hand_fast_offset_transform is not None:
--            if cfg.action.hand_action_transform is None:
--                raise ValueError(
--                    "action.hand_fast_offset_transform requires "
--                    "action.hand_action_transform"
--                )
--            if not callable(cfg.action.hand_fast_offset_transform):
--                raise TypeError(
--                    "action.hand_fast_offset_transform must be callable or None"
--                )
--        for fn_name in (
--            "hand_state_reset_fn",
--            "hand_state_export_fn",
--            "hand_state_import_fn",
+@@ -19,7 +19,9 @@ from .utils.obs_utils import (
+     compute_intermediate_values,
+     compute_obs_dim,
+ )
++from .utils.obs_seam import validate_latent_obs_config
+ from .utils.reset_utils import allocate_state_buffers, reset_env_state
++from .utils.resume_utils import get_env_state, set_env_state
+ from .utils.reward_utils import compute_rewards
+ from .utils.scene_utils import apply_physx_material_properties, setup_scene
+ from .utils.termination_utils import compute_terminations, update_tolerance_curriculum
+@@ -34,10 +36,32 @@ class SimToolRealEnv(DirectRLEnv):
+     def __init__(
+         self, cfg: SimToolRealEnvCfg, render_mode: str | None = None, **kwargs
+     ) -> None:
+-        # Override obs/state space from configured field lists before
++        # Override spaces from configured field lists before
+         # DirectRLEnv / rl_games observes the configclass.
+-        cfg.observation_space = compute_obs_dim(cfg.obs.obs_list)
+-        cfg.state_space = compute_obs_dim(cfg.obs.state_list)
++        hand_action_dim = int(cfg.action.hand_action_dim)
++        if hand_action_dim < 1:
++            raise ValueError("action.hand_action_dim must be positive")
++        if cfg.action.hand_action_transform is None:
++            assert hand_action_dim == 22, (
++                "action.hand_action_dim must be 22 when "
++                "action.hand_action_transform is None"
++            )
++        elif not callable(cfg.action.hand_action_transform):
++            raise TypeError("action.hand_action_transform must be callable or None")
 +        if (
 +            cfg.action.hand_state_reset_fn is not None
 +            and not callable(cfg.action.hand_state_reset_fn)
-         ):
--            fn = getattr(cfg.action, fn_name)
--            if fn is not None and not callable(fn):
--                raise TypeError(f"action.{fn_name} must be callable or None")
--        if (cfg.action.hand_state_export_fn is None) != (
--            cfg.action.hand_state_import_fn is None
--        ):
--            raise ValueError(
--                "action.hand_state_export_fn and action.hand_state_import_fn "
--                "must be provided together"
--            )
++        ):
 +            raise TypeError("action.hand_state_reset_fn must be callable or None")
-         num_latent_obs = validate_latent_obs_config(
-             cfg.obs.num_latent_obs, cfg.obs.latent_obs_fn
++        num_latent_obs = validate_latent_obs_config(
++            cfg.obs.num_latent_obs, cfg.obs.latent_obs_fn
++        )
++        cfg.obs.num_latent_obs = num_latent_obs
++        cfg.action_space = 7 + hand_action_dim
++        cfg.observation_space = compute_obs_dim(
++            cfg.obs.obs_list, num_latent_obs
++        )
++        cfg.state_space = compute_obs_dim(cfg.obs.state_list, num_latent_obs)
+ 
+         super().__init__(cfg, render_mode, **kwargs)  # runs _setup_scene
+         apply_physx_material_properties(self)
+@@ -49,15 +73,28 @@ class SimToolRealEnv(DirectRLEnv):
+     def _reset_idx(self, env_ids) -> None:
+         if env_ids is None:
+             env_ids = torch.arange(self.num_envs, device=self.device)
+-        super()._reset_idx(env_ids)
+-        reset_env_state(
+-            self,
+-            torch.as_tensor(env_ids, device=self.device, dtype=torch.long),
++        env_ids = torch.as_tensor(
++            env_ids,
++            device=self.device,
++            dtype=torch.long,
          )
++        super()._reset_idx(env_ids)
++        reset_env_state(self, env_ids)
++        if self.cfg.action.hand_state_reset_fn is not None:
++            self.cfg.action.hand_state_reset_fn(env_ids)
+ 
+     def _pre_physics_step(self, actions: torch.Tensor) -> None:
++        log_warm_resume = getattr(self, "_warm_resume_log_steps", 0) > 0
++        if log_warm_resume:
++            previous_targets = self._prev_targets.clone()
+         apply_action_pipeline(self, actions)
+         apply_wrench_dr(self)
++        if log_warm_resume:
++            delta = (self._cur_targets - previous_targets).abs().max().item()
++            print(
++                "[simtoolreal] post-resume commanded-target step: "
++                f"max_abs_delta={delta:.6f}"
++            )
+ 
+     def _apply_action(self) -> None:
+         # Called decimation times per policy step; idempotent.
+@@ -66,7 +103,14 @@ class SimToolRealEnv(DirectRLEnv):
+     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
+         update_tolerance_curriculum(self)
+         compute_intermediate_values(self)
+-        return compute_terminations(self)
++        terminated, truncated = compute_terminations(self)
++        if getattr(self, "_warm_resume_log_steps", 0) > 0:
++            self._warm_resume_log_steps -= 1
++            n_reset = int((terminated | truncated).sum().item())
++            print(
++                f"[simtoolreal] post-resume resets: {n_reset}/{self.num_envs}"
++            )
++        return terminated, truncated
+ 
+     def _get_rewards(self) -> torch.Tensor:
+         reward = compute_rewards(self)
+@@ -79,3 +123,11 @@ class SimToolRealEnv(DirectRLEnv):
+     def get_student_obs(self) -> dict[str, torch.Tensor]:
+         """Return opt-in student observations for distillation code."""
+         return build_student_observations(self)
++
++    def get_env_state(self) -> dict | None:
++        """Warm-resume snapshot carried inside rl_games checkpoints."""
++        return get_env_state(self)
++
++    def set_env_state(self, state: dict | None) -> None:
++        """Restore a warm-resume snapshot (no mass env reset on resume)."""
++        set_env_state(self, state)
 diff --git a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
-index 2ebfb607..3d69e766 100644
+index 892f03c4b65e96427e59a2bbabf9386c09524be6..3d69e76641840a23bfb4fb29c74c599652b0afc6 100644
 --- a/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
 +++ b/isaacsimenvs/tasks/simtoolreal/simtoolreal_env_cfg.py
-@@ -337,19 +337,9 @@ class ActionCfg:
-     hand_action_transform: (
-         Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None
-     ) = None
--    # Optional memoryless offset decoded from the same raw hand action. The
--    # action pipeline adds it after the slow hand EMA and before final clamp.
--    hand_fast_offset_transform: (
--        Callable[[torch.Tensor], torch.Tensor] | None
--    ) = None
-     # Optional adapter reset notification. Receives the one-dimensional int64
-     # tensor of environment indices after their hand positions/targets reset.
-     hand_state_reset_fn: Callable[[torch.Tensor], None] | None = None
--    # Optional adapter checkpoint hooks for warm resume. Export returns the
--    # adapter's evolving cross-step state (CPU tensor dict) or None; import
--    # receives exactly what export returned when the checkpoint was written.
--    hand_state_export_fn: Callable[[], dict | None] | None = None
--    hand_state_import_fn: Callable[[dict | None], None] | None = None
+@@ -32,6 +32,10 @@ all DirectRLEnv hooks raise NotImplementedError. Phases B–H populate them.
+ 
+ from __future__ import annotations
+ 
++from collections.abc import Callable
++
++import torch
++
+ from isaaclab.envs import DirectRLEnvCfg, ViewerCfg
+ from isaaclab.scene import InteractiveSceneCfg
+ from isaaclab.sim import PhysxCfg, SimulationCfg
+@@ -128,6 +132,7 @@ class ObsCfg:
+         "progress",
+         "successes",
+         "reward",
++        "latent_state",
+     )
+     obs_list: tuple[str, ...] = (
+         "joint_pos",
+@@ -140,8 +145,14 @@ class ObsCfg:
+         "keypoints_rel_palm",
+         "keypoints_rel_goal",
+         "object_scales",
++        "latent_state",
+     )
+ 
++    num_latent_obs: int = 0
++    # Callable receives raw measured (N, 22) hand positions and the previously
++    # applied (post-EMA) (N, 22) hand targets, both in Lab joint order, and
++    # returns the adapter-defined (N, num_latent_obs) latent state.
++    latent_obs_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None = None
+     clamp_abs_observations: float = 10.0
+ 
+ 
+@@ -320,6 +331,15 @@ class ActionCfg:
+     arm_moving_average: float = 0.1
+     hand_moving_average: float = 0.1
+     dof_speed_scale: float = 1.5
++    hand_action_dim: int = 22
++    # Callable receives (raw policy hand actions, Lab-order previous hand targets)
++    # and returns 22 absolute Lab-order hand joint targets.
++    hand_action_transform: (
++        Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None
++    ) = None
++    # Optional adapter reset notification. Receives the one-dimensional int64
++    # tensor of environment indices after their hand positions/targets reset.
++    hand_state_reset_fn: Callable[[torch.Tensor], None] | None = None
  
  
  # ----------------------------------------------------------------------------
-@@ -472,6 +462,8 @@ class TerminationCfg:
+@@ -442,6 +462,8 @@ class TerminationCfg:
      tolerance_curriculum_increment: float = 0.9  # multiplicative per step
      tolerance_curriculum_interval: int = 3000  # env steps across all agents
      tolerance_curriculum_success_threshold: float = 3.0
@@ -71,127 +342,604 @@ index 2ebfb607..3d69e766 100644
  
  
  # ----------------------------------------------------------------------------
+@@ -546,7 +568,8 @@ class SimToolRealEnvCfg(DirectRLEnvCfg):
+     # --- DirectRLEnvCfg required fields ---
+     decimation: int = 2  # 2 physics substeps per policy step
+     episode_length_s: float = 10.0  # 600 policy steps * 2 * (1/120) = 10s
+-    action_space: int = 29  # 7-DOF IIWA + 22-DOF SHARPA hand
++    # Re-derived as 7 + action.hand_action_dim in SimToolRealEnv.__init__.
++    action_space: int = 29
+     # Obs/state sizes are derived from obs.obs_list / obs.state_list at env init.
+     # Placeholder keeps the configclass instantiable before the env computes the
+     # final spaces.
+@@ -584,6 +607,10 @@ class SimToolRealEnvCfg(DirectRLEnvCfg):
+         clone_in_fabric=False,
+     )
+ 
++    # Carry full task-level world state in rl_games checkpoints so a resumed
++    # run continues without a mass environment reset (warm resume).
++    checkpoint_env_state: bool = True
++
+     # --- Sectioned sub-configs (mirror YAML sections 1:1) ---
+     assets: AssetsCfg = AssetsCfg()
+     obs: ObsCfg = ObsCfg()
 diff --git a/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
-index dc29c103..442fa833 100644
+index 17da0abbc42b67447019dfa806b825ee0d7bbc6c..442fa833a1e9dc6b85f249fee7783979af62f81b 100644
 --- a/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
 +++ b/isaacsimenvs/tasks/simtoolreal/utils/action_utils.py
-@@ -56,10 +56,6 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
+@@ -7,6 +7,39 @@ import math
+ import torch
+ 
+ 
++NUM_HAND_JOINTS = 22
++
++
++def compute_hand_raw_targets(
++    hand_actions: torch.Tensor,
++    prev_hand_targets: torch.Tensor,
++    hand_lower: torch.Tensor,
++    hand_upper: torch.Tensor,
++    hand_action_transform=None,
++) -> torch.Tensor:
++    """Decode policy hand actions into absolute Lab-order hand joint targets.
++
++    A custom transform receives the raw policy-order ``(N, K)`` hand slice and
++    Lab-order ``(N, 22)`` previous hand targets. The default path instead
++    receives an already canonical-to-Lab-permuted ``(N, 22)`` hand slice.
++    """
++    if hand_action_transform is None:
++        assert hand_actions.shape[-1] == NUM_HAND_JOINTS, (
++            "hand_action_dim must be 22 when hand_action_transform is None"
++        )
++        return hand_lower + 0.5 * (hand_actions + 1.0) * (
++            hand_upper - hand_lower
++        )
++
++    hand_targets = hand_action_transform(hand_actions, prev_hand_targets)
++    if hand_targets.shape != prev_hand_targets.shape:
++        raise ValueError(
++            "hand_action_transform must return shape "
++            f"{tuple(prev_hand_targets.shape)}, got {tuple(hand_targets.shape)}"
++        )
++    return hand_targets
++
++
+ def sample_log_uniform(lo_hi: tuple[float, float], n: int) -> torch.Tensor:
+     """Log-uniform sample on CPU (caller moves to device)."""
+     lo, hi = lo_hi
+@@ -17,7 +50,8 @@ def sample_log_uniform(lo_hi: tuple[float, float], n: int) -> torch.Tensor:
+ 
+ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
+     """Apply delay, canonical-to-Lab mapping, smoothing, and target clamps."""
+-    # Debug replay path accepts an already Lab-order target.
++    # Debug replay accepts an already Lab-order target and intentionally bypasses
++    # action delay, hand transformation, smoothing, and clamping.
+     replay_target = getattr(env, "_replay_target_lab_order", None)
      if replay_target is not None:
          env._cur_targets[:] = replay_target
-         env._prev_targets = env._cur_targets.clone()
--        if env._slow_hand_targets is not None:
--            env._slow_hand_targets.copy_(
--                replay_target[:, env._hand_joint_ids]
--            )
-         return
+@@ -30,9 +64,6 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
  
-     dr = env.cfg.domain_randomization
-@@ -105,32 +101,10 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
-         env._hand_upper,
-         act_cfg.hand_action_transform,
+     actions = actions.clone().to(env.device)
+ 
+-    # Canonical policy order -> Lab parser order.
+-    actions = actions[:, env._perm_canon_to_lab]
+-
+     # Action delay.
+     if dr.use_action_delay and dr.action_delay_max > 0:
+         episode_start = (env.episode_length_buf == 0) & (env._successes == 0)
+@@ -48,23 +79,31 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
+         ]
+ 
+     # Arm: velocity-delta accumulator.
+-    arm_action = actions[:, :7]
+-    arm_raw = env._prev_targets[:, :7] + act_cfg.dof_speed_scale * dt * arm_action
++    arm_action = actions[:, env._arm_action_ids]
++    prev_arm_targets = env._prev_targets[:, env._arm_joint_ids]
++    arm_raw = prev_arm_targets + act_cfg.dof_speed_scale * dt * arm_action
+     arm_raw = torch.clamp(arm_raw, env._arm_lower, env._arm_upper)
+     arm_smoothed = (
+         act_cfg.arm_moving_average * arm_raw
+-        + (1.0 - act_cfg.arm_moving_average) * env._prev_targets[:, :7]
++        + (1.0 - act_cfg.arm_moving_average) * prev_arm_targets
      )
--    previous_slow_hand_targets = prev_hand_targets
--    if env._slow_hand_targets is not None:
--        previous_slow_hand_targets = env._slow_hand_targets
+     arm_smoothed = torch.clamp(arm_smoothed, env._arm_lower, env._arm_upper)
+ 
+-    # Hand: absolute [-1, 1] scale.
++    # Hand: configurable policy slice -> absolute Lab-order targets.
+     hand_action = actions[:, 7:]
+-    hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
+-        env._hand_upper - env._hand_lower
++    prev_hand_targets = env._prev_targets[:, env._hand_joint_ids]
++    if act_cfg.hand_action_transform is None:
++        hand_action = hand_action[:, env._hand_action_ids]
++    hand_raw = compute_hand_raw_targets(
++        hand_action,
++        prev_hand_targets,
++        env._hand_lower,
++        env._hand_upper,
++        act_cfg.hand_action_transform,
+     )
      hand_smoothed = (
          act_cfg.hand_moving_average * hand_raw
--        + (1.0 - act_cfg.hand_moving_average) * previous_slow_hand_targets
+-        + (1.0 - act_cfg.hand_moving_average) * env._prev_targets[:, 7:]
 +        + (1.0 - act_cfg.hand_moving_average) * prev_hand_targets
      )
--    if act_cfg.hand_fast_offset_transform is not None:
--        if env._slow_hand_targets is None:
--            raise RuntimeError("fast-offset control requires slow-target state")
--        fast_offset = act_cfg.hand_fast_offset_transform(hand_action)
--        if fast_offset.shape != hand_smoothed.shape:
--            raise ValueError(
--                "hand_fast_offset_transform must return shape "
--                f"{tuple(hand_smoothed.shape)}, got {tuple(fast_offset.shape)}"
--            )
--        if (
--            fast_offset.device != hand_smoothed.device
--            or fast_offset.dtype != hand_smoothed.dtype
--        ):
--            raise ValueError(
--                "hand_fast_offset_transform output device/dtype must match "
--                "the hand target"
--            )
--        env._slow_hand_targets.copy_(hand_smoothed)
--        hand_smoothed = hand_smoothed + fast_offset
      hand_smoothed = torch.clamp(hand_smoothed, env._hand_lower, env._hand_upper)
  
-     # Write Lab-order targets and cache them for the next step.
+@@ -130,4 +169,9 @@ def apply_wrench_dr(env) -> None:
+     )
+ 
+ 
+-__all__ = ["apply_action_pipeline", "apply_wrench_dr", "sample_log_uniform"]
++__all__ = [
++    "apply_action_pipeline",
++    "apply_wrench_dr",
++    "compute_hand_raw_targets",
++    "sample_log_uniform",
++]
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/obs_seam.py b/isaacsimenvs/tasks/simtoolreal/utils/obs_seam.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b47158bfcd5db5d9c5ba74a46f3062709e3bda26
+--- /dev/null
++++ b/isaacsimenvs/tasks/simtoolreal/utils/obs_seam.py
+@@ -0,0 +1,129 @@
++"""Kit-free observation sizing and external latent-term helpers."""
++
++from __future__ import annotations
++
++from collections.abc import Callable
++
++import torch
++
++
++NUM_JOINTS: int = 29
++NUM_HAND_JOINTS: int = 22
++NUM_FINGERTIPS: int = 5
++NUM_KEYPOINTS: int = 4
++
++OBS_FIELD_SIZES: dict[str, int] = {
++    "joint_pos": NUM_JOINTS,
++    "joint_vel": NUM_JOINTS,
++    "prev_action_targets": NUM_JOINTS,
++    "palm_pos": 3,
++    "palm_rot": 4,
++    "palm_vel": 6,
++    "object_rot": 4,
++    "object_vel": 6,
++    "fingertip_pos_rel_palm": 3 * NUM_FINGERTIPS,  # 15
++    "keypoints_rel_palm": 3 * NUM_KEYPOINTS,  # 12
++    "keypoints_rel_goal": 3 * NUM_KEYPOINTS,  # 12
++    "object_scales": 3,
++    "closest_keypoint_max_dist": 1,
++    "closest_fingertip_dist": NUM_FINGERTIPS,  # 5
++    "lifted_object": 1,
++    "progress": 1,
++    "successes": 1,
++    "reward": 1,
++    # Dynamic width supplied to compute_obs_dim from obs.num_latent_obs.
++    "latent_state": 0,
++}
++
++
++def validate_latent_obs_config(
++    num_latent_obs: int,
++    latent_obs_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None,
++) -> int:
++    """Validate the adapter seam and return its normalized width."""
++    width = int(num_latent_obs)
++    if width < 0:
++        raise ValueError("obs.num_latent_obs must be non-negative")
++    if latent_obs_fn is None:
++        if width > 0:
++            raise ValueError(
++                "obs.latent_obs_fn is required when obs.num_latent_obs > 0"
++            )
++    elif not callable(latent_obs_fn):
++        raise TypeError("obs.latent_obs_fn must be callable or None")
++    return width
++
++
++def compute_obs_dim(field_list, num_latent_obs: int = 0) -> int:
++    """Return the configured width of an ordered observation field list."""
++    width = int(num_latent_obs)
++    if width < 0:
++        raise ValueError("obs.num_latent_obs must be non-negative")
++    return sum(
++        width if field == "latent_state" else OBS_FIELD_SIZES[field]
++        for field in field_list
++    )
++
++
++def compute_latent_state(
++    hand_joint_pos: torch.Tensor,
++    hand_prev_targets: torch.Tensor,
++    num_latent_obs: int,
++    latent_obs_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] | None,
++) -> torch.Tensor:
++    """Call the adapter once and validate its ``(N, L)`` result."""
++    width = validate_latent_obs_config(num_latent_obs, latent_obs_fn)
++    expected_input_shape = (hand_joint_pos.shape[0], NUM_HAND_JOINTS)
++    if tuple(hand_joint_pos.shape) != expected_input_shape:
++        raise ValueError(
++            "latent_obs_fn input must have shape "
++            f"{expected_input_shape}, got {tuple(hand_joint_pos.shape)}"
++        )
++    if tuple(hand_prev_targets.shape) != expected_input_shape:
++        raise ValueError(
++            "latent_obs_fn previous-target input must have shape "
++            f"{expected_input_shape}, got {tuple(hand_prev_targets.shape)}"
++        )
++    if hand_prev_targets.device != hand_joint_pos.device:
++        raise ValueError(
++            "latent_obs_fn previous-target input must be on the "
++            "measured-position device"
++        )
++    if hand_prev_targets.dtype != hand_joint_pos.dtype:
++        raise ValueError(
++            "latent_obs_fn previous-target input must have the "
++            "measured-position dtype"
++        )
++    if width == 0:
++        return hand_joint_pos[:, :0]
++
++    latent_state = latent_obs_fn(hand_joint_pos, hand_prev_targets)
++    if not isinstance(latent_state, torch.Tensor):
++        raise TypeError("obs.latent_obs_fn must return a torch.Tensor")
++    expected_output_shape = (hand_joint_pos.shape[0], width)
++    if tuple(latent_state.shape) != expected_output_shape:
++        raise ValueError(
++            "obs.latent_obs_fn must return shape "
++            f"{expected_output_shape}, got {tuple(latent_state.shape)}"
++        )
++    if latent_state.device != hand_joint_pos.device:
++        raise ValueError(
++            "obs.latent_obs_fn must return a tensor on the input device"
++        )
++    if latent_state.dtype != hand_joint_pos.dtype:
++        raise ValueError(
++            "obs.latent_obs_fn must return a tensor with the input dtype"
++        )
++    return latent_state
++
++
++__all__ = [
++    "NUM_FINGERTIPS",
++    "NUM_HAND_JOINTS",
++    "NUM_JOINTS",
++    "NUM_KEYPOINTS",
++    "OBS_FIELD_SIZES",
++    "compute_latent_state",
++    "compute_obs_dim",
++    "validate_latent_obs_config",
++]
+diff --git a/isaacsimenvs/tasks/simtoolreal/utils/obs_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/obs_utils.py
+index ffd8ff96fc3960af658ac7d76cd43b57552b6f72..ef72ee3a05bdf668e1ffc1cd64375d61154f71e7 100644
+--- a/isaacsimenvs/tasks/simtoolreal/utils/obs_utils.py
++++ b/isaacsimenvs/tasks/simtoolreal/utils/obs_utils.py
+@@ -8,16 +8,21 @@ import torch
+ 
+ from isaaclab.utils.math import convert_quat, quat_apply, quat_from_angle_axis, quat_mul
+ 
++from .obs_seam import (
++    NUM_FINGERTIPS,
++    NUM_JOINTS,
++    NUM_KEYPOINTS,
++    OBS_FIELD_SIZES,
++    compute_latent_state,
++    compute_obs_dim,
++)
++
+ 
+ # ----------------------------------------------------------------------------
+ # Constants
+ # ----------------------------------------------------------------------------
+ 
+ 
+-NUM_JOINTS: int = 29
+-NUM_FINGERTIPS: int = 5
+-NUM_KEYPOINTS: int = 4
+-
+ # Policy was trained against the palm center, not the raw wrist body.
+ PALM_CENTER_OFFSET: tuple[float, float, float] = (-0.0, -0.02, 0.16)
+ 
+@@ -32,33 +37,6 @@ KEYPOINT_CORNERS: tuple[tuple[int, int, int], ...] = (
+     (-1, -1, -1),
+ )
+ 
+-OBS_FIELD_SIZES: dict[str, int] = {
+-    "joint_pos": NUM_JOINTS,
+-    "joint_vel": NUM_JOINTS,
+-    "prev_action_targets": NUM_JOINTS,
+-    "palm_pos": 3,
+-    "palm_rot": 4,
+-    "palm_vel": 6,
+-    "object_rot": 4,
+-    "object_vel": 6,
+-    "fingertip_pos_rel_palm": 3 * NUM_FINGERTIPS,  # 15
+-    "keypoints_rel_palm": 3 * NUM_KEYPOINTS,  # 12
+-    "keypoints_rel_goal": 3 * NUM_KEYPOINTS,  # 12
+-    "object_scales": 3,
+-    "closest_keypoint_max_dist": 1,
+-    "closest_fingertip_dist": NUM_FINGERTIPS,  # 5
+-    "lifted_object": 1,
+-    "progress": 1,
+-    "successes": 1,
+-    "reward": 1,
+-}
+-
+-
+-def compute_obs_dim(field_list) -> int:
+-    """Return total tensor dim for an ordered list of obs field names."""
+-    return sum(OBS_FIELD_SIZES[f] for f in field_list)
+-
+-
+ def _stack_obs_dict(obs_dict: dict[str, torch.Tensor], field_list) -> torch.Tensor:
+     """Concatenate named tensors in config order."""
+     return torch.cat(
+@@ -305,6 +283,21 @@ def build_observations(env) -> dict[str, torch.Tensor]:
+     obj_rot_xyzw = convert_quat(obj_rot, to="xyzw")
+     noisy_obj_rot_xyzw = convert_quat(noisy_obj_rot, to="xyzw")
+ 
++    if env.cfg.obs.num_latent_obs > 0:
++        # The joint IDs select raw measured positions and previously applied
++        # (post-EMA) hand targets in Isaac Lab order.
++        hand_joint_pos = env.robot.data.joint_pos[:, env._hand_joint_ids]
++        hand_prev_targets = env._prev_targets[:, env._hand_joint_ids]
++        latent_state = compute_latent_state(
++            hand_joint_pos,
++            hand_prev_targets,
++            env.cfg.obs.num_latent_obs,
++            env.cfg.obs.latent_obs_fn,
++        )
++    else:
++        # Preserve the default RNG/data path while satisfying the zero-width term.
++        latent_state = joint_pos[:, :0]
++
+     obs_clean: dict[str, torch.Tensor] = {
+         "joint_pos": joint_pos,
+         "joint_vel": joint_vel,
+@@ -324,8 +317,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
+         "progress": torch.log(env.episode_length_buf.float() / 10.0 + 1.0).unsqueeze(-1),
+         "successes": torch.log(env._successes.float() + 1.0).unsqueeze(-1),
+         "reward": (env.reward_buf * 0.01).unsqueeze(-1),
++        "latent_state": latent_state,
+     }
+ 
++    # Like prev_action_targets, the derived latent is shared between clean and
++    # noisy dictionaries: no sensor-field noise is applied. The actor copy
++    # participates only in the whole-policy delay below; the critic stays current.
+     obs_noisy = dict(obs_clean)
+     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
+     obs_noisy["object_vel"] = noisy_obj_vel
 diff --git a/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
-index 5c8dabe5..6e23893f 100644
+index 310bd76004bf21a9a600d66ab1e5a56fa3de4b22..6e23893f4de50df5523388e91b7dc6f1d1d81cf7 100644
 --- a/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
 +++ b/isaacsimenvs/tasks/simtoolreal/utils/reset_utils.py
-@@ -78,15 +78,6 @@ def allocate_state_buffers(env) -> None:
-     num_joints = len(lab_names)
-     env._cur_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
-     env._prev_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
--    env._slow_hand_targets = (
--        torch.zeros(
--            env.num_envs,
--            len(env._hand_joint_ids),
--            device=env.device,
--        )
--        if env.cfg.action.hand_fast_offset_transform is not None
--        else None
--    )
+@@ -48,6 +48,18 @@ def allocate_state_buffers(env) -> None:
+         [lab_names.index(n) for n in JOINT_NAMES_CANONICAL],
+         device=env.device, dtype=torch.long,
+     )
++    # Policy arm actions are canonical indices 0:7. Default hand actions are
++    # canonical indices 7:29, with the offset removed for the hand-only slice.
++    env._arm_action_ids = env._perm_canon_to_lab[env._arm_joint_ids]
++    env._hand_action_ids = (
++        env._perm_canon_to_lab[env._hand_joint_ids] - len(env._arm_joint_ids)
++    )
++    assert sorted(env._arm_action_ids.tolist()) == list(
++        range(len(env._arm_joint_ids))
++    )
++    assert sorted(env._hand_action_ids.tolist()) == list(
++        range(len(env._hand_joint_ids))
++    )
+ 
+     limits = env.robot.data.joint_pos_limits  # (N, num_joints, 2), Lab order
+ 
+@@ -63,8 +75,9 @@ def allocate_state_buffers(env) -> None:
+ 
+     # --- Action target buffers  ---
+     action_space = env.cfg.action_space
+-    env._cur_targets = torch.zeros(env.num_envs, action_space, device=env.device)
+-    env._prev_targets = torch.zeros(env.num_envs, action_space, device=env.device)
++    num_joints = len(lab_names)
++    env._cur_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
++    env._prev_targets = torch.zeros(env.num_envs, num_joints, device=env.device)
  
      # --- Keypoint offsets in object local frame ---
      corners = torch.tensor(
-@@ -240,8 +231,6 @@ def _randomize_robot_dof_state(env, env_ids: torch.Tensor) -> None:
-     env.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
-     env._prev_targets[env_ids] = joint_pos
-     env._cur_targets[env_ids] = joint_pos
--    if env._slow_hand_targets is not None:
--        env._slow_hand_targets[env_ids] = joint_pos[:, env._hand_joint_ids]
- 
- 
- def _reset_table_pose(env, env_ids: torch.Tensor) -> None:
 diff --git a/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
-index 4851d421..6f385b04 100644
---- a/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f385b040a12550ae4cda4886ddcfedf23360ae0
+--- /dev/null
 +++ b/isaacsimenvs/tasks/simtoolreal/utils/resume_utils.py
-@@ -47,7 +47,6 @@ _BUFFER_NAMES = (
- 
- # Buffers that only exist for some configurations / task variants.
- _OPTIONAL_BUFFER_NAMES = (
--    "_slow_hand_targets",
-     "_traj_id",
-     "_traj_step",
-     "_student_camera_queue",
-@@ -86,7 +85,6 @@ def get_env_state(env) -> dict | None:
-         ),
-     }
- 
--    export_fn = env.cfg.action.hand_state_export_fn
-     return {
-         "schema": ENV_STATE_SCHEMA,
-         "num_envs": int(env.num_envs),
-@@ -100,7 +98,6 @@ def get_env_state(env) -> dict | None:
-         },
-         "sim": sim,
-         "rng": rng,
--        "hand_transform": None if export_fn is None else export_fn(),
-     }
- 
- 
-@@ -175,12 +172,6 @@ def set_env_state(env, state: dict | None) -> None:
-     if rng["torch_cuda"] is not None:
-         torch.cuda.set_rng_state(rng["torch_cuda"], device)
- 
--    import_fn = env.cfg.action.hand_state_import_fn
--    if import_fn is not None:
--        if "hand_transform" not in state:
--            raise ValueError("env_state is missing the hand_transform payload")
--        import_fn(state["hand_transform"])
--
-     # Post-resume diagnostics window: the env prints per-step reset counts and
-     # commanded-target deltas for the first few steps after a warm restore.
-     env._warm_resume_log_steps = 3
+@@ -0,0 +1,186 @@
++"""Warm-resume env state capture/restore for SimToolReal.
++
++``get_env_state`` snapshots every cross-step evolving buffer that shapes
++dynamics, observations, rewards, or logging, plus sim dof/root states and
++process RNG, into a CPU tensor dict that rides inside rl_games checkpoints
++(``A2CBase.get_full_state_weights`` -> ``vec_env.get_env_state``).
++``set_env_state`` writes it all back so a resumed run continues with no mass
++environment reset.
++
++Deliberately excluded: within-step caches recomputed before use each step
++(``_keypoints_max_dist``, ``_curr_fingertip_distances``, ``_near_goal``,
++``_is_success``, ``_termination_reasons``, ``_reward_terms``, ``reward_buf``,
++``reset_terminated``/``reset_time_outs``) and PhysX solver-internal
++transients (contact caches, warm-start impulses), which cannot be serialized
++through Isaac Lab and decay within a step.
++"""
++
++from __future__ import annotations
++
++import torch
++
++
++ENV_STATE_SCHEMA = "simtoolreal_env_state_v1"
++
++# Cross-step per-env buffers captured verbatim (allocate_state_buffers).
++_BUFFER_NAMES = (
++    "_cur_targets",
++    "_prev_targets",
++    "_object_scale_multiplier",
++    "_lifted_object",
++    "_closest_keypoint_max_dist",
++    "_closest_fingertip_dist",
++    "_successes",
++    "_near_goal_steps",
++    "_prev_episode_successes",
++    "_object_init_z",
++    "_table_z_per_env",
++    "_object_state_queue",
++    "_obs_queue",
++    "_action_queue",
++    "_random_force_prob",
++    "_random_torque_prob",
++    "_object_forces",
++    "_object_torques",
++    "episode_length_buf",
++)
++
++# Buffers that only exist for some configurations / task variants.
++_OPTIONAL_BUFFER_NAMES = (
++    "_traj_id",
++    "_traj_step",
++    "_student_camera_queue",
++    "_student_obs_queue",
++    "goal_yaw_obs_noise",
++)
++
++
++def get_env_state(env) -> dict | None:
++    """Snapshot warm-resume state; None when disabled by config."""
++    if not env.cfg.checkpoint_env_state:
++        return None
++
++    buffers = {}
++    for name in _BUFFER_NAMES:
++        buffers[name] = getattr(env, name).detach().cpu().clone()
++    for name in _OPTIONAL_BUFFER_NAMES:
++        value = getattr(env, name, None)
++        if isinstance(value, torch.Tensor):
++            buffers[name] = value.detach().cpu().clone()
++
++    sim = {
++        "robot_joint_pos": env.robot.data.joint_pos.detach().cpu().clone(),
++        "robot_joint_vel": env.robot.data.joint_vel.detach().cpu().clone(),
++        "object_root_state": env.object.data.root_state_w.detach().cpu().clone(),
++        "table_root_state": env.table.data.root_state_w.detach().cpu().clone(),
++        "goal_root_state": env.goal_viz.data.root_state_w.detach().cpu().clone(),
++    }
++
++    rng = {
++        "torch_cpu": torch.get_rng_state(),
++        "torch_cuda": (
++            torch.cuda.get_rng_state(env.device)
++            if torch.device(env.device).type == "cuda"
++            else None
++        ),
++    }
++
++    return {
++        "schema": ENV_STATE_SCHEMA,
++        "num_envs": int(env.num_envs),
++        "buffers": buffers,
++        "scalars": {
++            "_current_success_tolerance": float(env._current_success_tolerance),
++            "_frame_counter": int(env._frame_counter),
++            "_last_curriculum_update": int(env._last_curriculum_update),
++            "common_step_counter": int(env.common_step_counter),
++            "_sim_step_counter": int(env._sim_step_counter),
++        },
++        "sim": sim,
++        "rng": rng,
++    }
++
++
++def set_env_state(env, state: dict | None) -> None:
++    """Restore warm-resume state written by :func:`get_env_state`.
++
++    ``None`` (pre-warm-resume checkpoint) keeps the legacy resume behavior —
++    envs continue from their current (initial) states — with a warning. An
++    env-count mismatch also degrades to that path, mirroring the rl_games
++    shape-mismatch skip for the algo-side per-env tensors. Anything else
++    malformed fails closed.
++    """
++    if state is None:
++        print(
++            "[simtoolreal] WARNING: checkpoint carries no env_state; resuming "
++            "without warm world state (expect a mass env reset transient)"
++        )
++        return
++    if not isinstance(state, dict) or state.get("schema") != ENV_STATE_SCHEMA:
++        raise ValueError(
++            f"unrecognized env_state schema: {state.get('schema') if isinstance(state, dict) else type(state)!r}"
++        )
++    if int(state["num_envs"]) != env.num_envs:
++        print(
++            "[simtoolreal] WARNING: checkpoint env_state has "
++            f"{state['num_envs']} envs but this run has {env.num_envs}; "
++            "skipping warm env state restore"
++        )
++        return
++
++    device = env.device
++    buffers = state["buffers"]
++    for name in _BUFFER_NAMES:
++        getattr(env, name).copy_(buffers[name].to(device))
++    for name in _OPTIONAL_BUFFER_NAMES:
++        live = getattr(env, name, None)
++        saved = buffers.get(name)
++        if isinstance(live, torch.Tensor) != (saved is not None):
++            raise ValueError(
++                f"checkpoint/env mismatch for optional state buffer {name!r}"
++            )
++        if saved is not None:
++            if isinstance(live, torch.Tensor):
++                live.copy_(saved.to(device))
++            else:
++                setattr(env, name, saved.to(device))
++
++    scalars = state["scalars"]
++    env._current_success_tolerance = float(scalars["_current_success_tolerance"])
++    env._frame_counter = int(scalars["_frame_counter"])
++    env._last_curriculum_update = int(scalars["_last_curriculum_update"])
++    env.common_step_counter = int(scalars["common_step_counter"])
++    env._sim_step_counter = int(scalars["_sim_step_counter"])
++
++    sim = state["sim"]
++    env.robot.write_joint_state_to_sim(
++        sim["robot_joint_pos"].to(device), sim["robot_joint_vel"].to(device)
++    )
++    for asset, key in (
++        (env.object, "object_root_state"),
++        (env.table, "table_root_state"),
++        (env.goal_viz, "goal_root_state"),
++    ):
++        root_state = sim[key].to(device)
++        asset.write_root_pose_to_sim(root_state[:, 0:7])
++        asset.write_root_velocity_to_sim(root_state[:, 7:13])
++    env.scene.write_data_to_sim()
++    env.sim.forward()
++
++    rng = state["rng"]
++    torch.set_rng_state(rng["torch_cpu"])
++    if rng["torch_cuda"] is not None:
++        torch.cuda.set_rng_state(rng["torch_cuda"], device)
++
++    # Post-resume diagnostics window: the env prints per-step reset counts and
++    # commanded-target deltas for the first few steps after a warm restore.
++    env._warm_resume_log_steps = 3
++    print(
++        "[simtoolreal] warm env state restored: "
++        f"num_envs={env.num_envs} "
++        f"frame_counter={env._frame_counter} "
++        f"success_tolerance={env._current_success_tolerance}"
++    )
++
++
++__all__ = ["ENV_STATE_SCHEMA", "get_env_state", "set_env_state"]
 diff --git a/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py b/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
-index 4960d133..039ee8cc 100644
+index 4960d133d44a630a13fbe3aeb0d29f5dff5c508f..039ee8cc2b450b5ea6043a77a30f207e717b2a13 100644
 --- a/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
 +++ b/isaacsimenvs/tasks/simtoolreal/utils/termination_utils.py
 @@ -11,7 +11,8 @@ def update_tolerance_curriculum(env) -> None:
@@ -204,8 +952,124 @@ index 4960d133..039ee8cc 100644
          successes = env._prev_episode_successes.float()
          eligible_mask = None
          if hasattr(env, "_curriculum_eligible_mask"):
+diff --git a/isaacsimenvs/tests/test_obs_action_spec.py b/isaacsimenvs/tests/test_obs_action_spec.py
+index aa06ff46af33835a0cba5b1305981b83e033f40a..c87d2ded32708eaf462dff018e6838141b6a6fbf 100644
+--- a/isaacsimenvs/tests/test_obs_action_spec.py
++++ b/isaacsimenvs/tests/test_obs_action_spec.py
+@@ -71,8 +71,11 @@ def main() -> None:
+     cfg.scene.num_envs = args.num_envs
+     cfg.assets.num_assets_per_type = args.num_assets_per_type
+ 
+-    assert compute_obs_dim(cfg.obs.obs_list) == expected_obs, (
+-        f"obs_list sums to {compute_obs_dim(cfg.obs.obs_list)}, "
++    configured_obs = compute_obs_dim(
++        cfg.obs.obs_list, cfg.obs.num_latent_obs
++    )
++    assert configured_obs == expected_obs, (
++        f"obs_list sums to {configured_obs}, "
+         f"checkpoint expects {expected_obs}"
+     )
+ 
+diff --git a/isaacsimenvs/tests/test_simtoolreal_env_smoke.py b/isaacsimenvs/tests/test_simtoolreal_env_smoke.py
+index 68c2d51f65241ba5bff57e860d18bec678113095..8e4659ae63fe3794f6062985a23425595de33cea 100644
+--- a/isaacsimenvs/tests/test_simtoolreal_env_smoke.py
++++ b/isaacsimenvs/tests/test_simtoolreal_env_smoke.py
+@@ -21,6 +21,7 @@ def main() -> None:
+     parser.add_argument("--num_envs", type=int, default=8)
+     parser.add_argument("--num_assets_per_type", type=int, default=2)
+     parser.add_argument("--steps", type=int, default=5)
++    parser.add_argument("--num_latent_obs", type=int, choices=(0, 4), default=0)
+     AppLauncher.add_app_launcher_args(parser)
+     args = parser.parse_args()
+     args.headless = True
+@@ -35,9 +36,33 @@ def main() -> None:
+     from isaaclab.sim.utils import find_matching_prim_paths
+     from isaacsimenvs.tasks.simtoolreal.simtoolreal_env_cfg import SimToolRealEnvCfg
+ 
++    class TestLatentObs:
++        def __init__(self, width: int):
++            self.width = width
++            self.calls = 0
++            self.last_input = None
++            self.last_prev_targets = None
++
++        def __call__(
++            self,
++            hand_joint_pos: torch.Tensor,
++            hand_prev_targets: torch.Tensor,
++        ) -> torch.Tensor:
++            assert hand_joint_pos.shape == (args.num_envs, 22)
++            assert hand_prev_targets.shape == (args.num_envs, 22)
++            self.calls += 1
++            self.last_input = hand_joint_pos.clone()
++            self.last_prev_targets = hand_prev_targets.clone()
++            return hand_joint_pos[:, : self.width]
++
+     cfg = SimToolRealEnvCfg()
+     cfg.scene.num_envs = args.num_envs
+     cfg.assets.num_assets_per_type = args.num_assets_per_type
++    latent_obs_fn = None
++    if args.num_latent_obs > 0:
++        latent_obs_fn = TestLatentObs(args.num_latent_obs)
++        cfg.obs.num_latent_obs = args.num_latent_obs
++        cfg.obs.latent_obs_fn = latent_obs_fn
+ 
+     env = gym.make("Isaacsimenvs-SimToolReal-Direct-v0", cfg=cfg)
+     inner = env.unwrapped
+@@ -88,7 +113,20 @@ def main() -> None:
+             f"{armature[lab_j]:>8.5f}  {friction[lab_j]:>8.5f}  {effort_lim[lab_j]:>8.4f}"
+         )
+ 
++    calls_before_reset = latent_obs_fn.calls if latent_obs_fn is not None else 0
+     obs, _ = env.reset()
++    expected_policy_dim = 140 + args.num_latent_obs
++    expected_critic_dim = 162 + args.num_latent_obs
++    assert obs["policy"].shape == (args.num_envs, expected_policy_dim)
++    assert obs["critic"].shape == (args.num_envs, expected_critic_dim)
++    if latent_obs_fn is not None:
++        assert latent_obs_fn.calls == calls_before_reset + 1
++        measured_hand_pos = inner.robot.data.joint_pos[:, inner._hand_joint_ids]
++        assert torch.equal(latent_obs_fn.last_input, measured_hand_pos)
++        assert torch.equal(
++            latent_obs_fn.last_prev_targets,
++            inner._prev_targets[:, inner._hand_joint_ids],
++        )
+     print(
+         f"[smoke] reset → policy obs {obs['policy'].shape}, "
+         f"critic obs {obs['critic'].shape}"
+@@ -99,7 +137,18 @@ def main() -> None:
+         action = torch.zeros(
+             (args.num_envs, action_dim), device=inner.device, dtype=torch.float32
+         )
++        calls_before_step = latent_obs_fn.calls if latent_obs_fn is not None else 0
+         obs, reward, terminated, truncated, info = env.step(action)
++        assert obs["policy"].shape == (args.num_envs, expected_policy_dim)
++        assert obs["critic"].shape == (args.num_envs, expected_critic_dim)
++        if latent_obs_fn is not None:
++            assert latent_obs_fn.calls == calls_before_step + 1
++            measured_hand_pos = inner.robot.data.joint_pos[:, inner._hand_joint_ids]
++            assert torch.equal(latent_obs_fn.last_input, measured_hand_pos)
++            assert torch.equal(
++                latent_obs_fn.last_prev_targets,
++                inner._prev_targets[:, inner._hand_joint_ids],
++            )
+         any_nan = (
+             torch.isnan(obs["policy"]).any().item()
+             or torch.isnan(obs["critic"]).any().item()
+@@ -107,7 +156,10 @@ def main() -> None:
+         )
+         if any_nan:
+             raise RuntimeError(f"step {step}: NaN detected in obs/reward")
+-    print(f"[smoke] OK — {args.steps} steps, no NaN")
++    print(
++        f"[smoke] OK — {args.steps} steps, no NaN, "
++        f"latent_dim={args.num_latent_obs}"
++    )
+ 
+     env.close()
+     app.close()
 diff --git a/isaacsimenvs/train.py b/isaacsimenvs/train.py
-index 0eca1a1c..9adc21f7 100644
+index 0eca1a1c5da95a44364cbf06e978cd0c00c3f8ae..9adc21f78d135de3fa7eef1e50b0a0f2cd5b2071 100644
 --- a/isaacsimenvs/train.py
 +++ b/isaacsimenvs/train.py
 @@ -135,12 +135,22 @@ def main() -> None:
@@ -289,3 +1153,52 @@ index 0eca1a1c..9adc21f7 100644
  
      run()
  
+diff --git a/isaacsimenvs/utils/rlgames_utils.py b/isaacsimenvs/utils/rlgames_utils.py
+index 500038d9e8ba21308889d7988775fa0aafb02380..797c0bcc56b5f8eaecc0c663c99a19ae617f7939 100644
+--- a/isaacsimenvs/utils/rlgames_utils.py
++++ b/isaacsimenvs/utils/rlgames_utils.py
+@@ -270,6 +270,15 @@ def register_rlgames_env(
+     from rl_games.common import env_configurations, vecenv
+     from isaaclab_rl.rl_games import RlGamesGpuEnv, RlGamesVecEnvWrapper
+ 
++    class _EnvStateRlGamesGpuEnv(RlGamesGpuEnv):
++        """Passthrough for warm-resume env state (rl_games checkpoint hooks)."""
++
++        def get_env_state(self):
++            return self.env.get_env_state()
++
++        def set_env_state(self, env_state):
++            self.env.set_env_state(env_state)
++
+     wrapper_cls = RlGamesVecEnvWrapper
+     if "teacher_obs" in env.unwrapped.single_observation_space.spaces:
+         class _DAggerRlGamesVecEnvWrapper(RlGamesVecEnvWrapper):
+@@ -293,10 +302,26 @@ def register_rlgames_env(
+                 return gym.spaces.Box(-self._clip_obs, self._clip_obs, spec.shape, dtype=spec.dtype)
+         wrapper_cls = _DAggerRlGamesVecEnvWrapper
+ 
+-    wrapped = wrapper_cls(env, rl_device, clip_obs, clip_actions)
++    class _EnvStateVecEnvWrapper(wrapper_cls):
++        """Warm-resume env state, piercing every gym wrapper via unwrapped."""
++
++        def get_env_state(self):
++            fn = getattr(self.unwrapped, "get_env_state", None)
++            return None if fn is None else fn()
++
++        def set_env_state(self, env_state):
++            fn = getattr(self.unwrapped, "set_env_state", None)
++            if fn is not None:
++                fn(env_state)
++            elif env_state is not None:
++                raise ValueError(
++                    "checkpoint carries env_state but the env cannot restore it"
++                )
++
++    wrapped = _EnvStateVecEnvWrapper(env, rl_device, clip_obs, clip_actions)
+     vecenv.register(
+         "IsaacRlgWrapper",
+-        lambda config_name, num_actors, **kw: RlGamesGpuEnv(config_name, num_actors, **kw),
++        lambda config_name, num_actors, **kw: _EnvStateRlGamesGpuEnv(config_name, num_actors, **kw),
+     )
+     env_configurations.register(
+         name,

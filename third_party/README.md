@@ -9,7 +9,7 @@ The software license files at the selected revisions identify:
 | Source | Software license | Selected source |
 | --- | --- | --- |
 | IsaacGymEnvs | BSD 3-Clause | [LICENSE.txt](https://github.com/isaac-sim/IsaacGymEnvs/blob/aeed298638a1f7b5421b38f5f3cc2d1079b6d9c3/LICENSE.txt) |
-| SimToolReal | MIT | [LICENSE](https://github.com/hgupt3/simtoolreal/blob/fddff7462bfb683becb8aa0d73d496dca6065af4/LICENSE) |
+| SimToolReal | MIT | [LICENSE](https://github.com/tylerlum/simtoolreal/blob/84058661e297576f0849a25782c6fc49d611338d/LICENSE) |
 | rl_games | MIT | Native source/wheel notices |
 | Spider | CC-by-NC, upstream license | [LICENSE](https://github.com/facebookresearch/spider/blob/71238456bf97a7eeb3d0471aa31974e2d404d4ae/LICENSE) |
 

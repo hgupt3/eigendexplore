@@ -11,8 +11,8 @@ benchmarks:
       patch: patches/dextreme-rl-games.patch
   simtoolreal:
     python: '3.11'
-    repository: https://github.com/hgupt3/simtoolreal.git
-    commit: fddff7462bfb683becb8aa0d73d496dca6065af4
+    repository: https://github.com/tylerlum/simtoolreal.git
+    commit: 84058661e297576f0849a25782c6fc49d611338d
     patch: patches/simtoolreal-release.patch
     rl_games:
       vendored: rl_games
